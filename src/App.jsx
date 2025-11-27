@@ -46,9 +46,18 @@ export default function FlowCraftLang() {
   };
 
   const handleLogin = async () => {
-    // التعديل: استخدام الدخول المجهول بدلاً من جوجل لتجنب تعقيدات الإعداد
-    const { error } = await supabase.auth.signInAnonymously();
-    if (error) console.error('Login error:', error);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          // هذا يضمن عودة المستخدم لموقعك بعد الموافقة
+          redirectTo: window.location.origin 
+        }
+      });
+      if (error) throw error;
+    } catch (error) {
+      alert("Error logging in: " + error.message);
+    }
   };
 
   const handleLogout = async () => {
