@@ -77,33 +77,32 @@ export default function FlowCraftLang() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [...messages, userMsg],
-          mode: mode, // 'chat' or 'lessons'
+          mode: mode,
           lessonId: currentLesson,
           userId: session.user.id
         })
       });
 
-      if (res.status === 403) {
-        alert("Free trial over! Use your Rasengan on the subscribe button! 🌀");
-        setLoading(false);
-        return;
+      const data = await res.json();
+
+      // 🛑 هنا الإصلاح: نتحقق هل يوجد خطأ من السيرفر؟
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Unknown Server Error");
       }
 
-      const data = await res.json();
-      
-      // منطق فتح الدرس التالي
-      if (data.message.includes("LESSON_COMPLETE")) {
-         // تنظيف الرسالة من الكود السري
+      // إذا وصلنا هنا، فالرد سليم ويحتوي على message
+      if (data.message && data.message.includes("LESSON_COMPLETE")) {
          const cleanMsg = data.message.replace("LESSON_COMPLETE", "");
-         setMessages(prev => [...prev, { role: 'assistant', content: cleanMsg + "\n\n🎉 Level Up! Next Lesson Unlocked!" }]);
-         setCurrentLesson(prev => prev + 1); // الانتقال للدرس التالي
+         setMessages(prev => [...prev, { role: 'assistant', content: cleanMsg + "\n\n🎉 Level Up!" }]);
+         setCurrentLesson(prev => prev + 1);
       } else {
          setMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
       }
 
     } catch (err) {
       console.error(err);
-      alert("AI Error: " + err.message); // هذا السطر سيفضح سبب المشكلة في شاشة الهاتف
+      // الآن سيظهر لك الخطأ الحقيقي (مثل: Subscription required أو 500)
+      alert("System Error: " + err.message); 
     } finally {
       setLoading(false);
     }
