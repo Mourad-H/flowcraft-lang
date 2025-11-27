@@ -47,16 +47,13 @@ export default function FlowCraftLang() {
 
   const handleLogin = async () => {
     try {
+      // حذفنا خيارات التوجيه. Supabase سيستخدم الرابط الافتراضي المسجل في لوحة التحكم
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          // هذا يضمن عودة المستخدم لموقعك بعد الموافقة
-          redirectTo: window.location.origin 
-        }
+        provider: 'google'
       });
       if (error) throw error;
     } catch (error) {
-      alert("Error logging in: " + error.message);
+      alert("Login failed: " + error.message);
     }
   };
 
@@ -106,6 +103,7 @@ export default function FlowCraftLang() {
 
     } catch (err) {
       console.error(err);
+      alert("AI Error: " + err.message); // هذا السطر سيفضح سبب المشكلة في شاشة الهاتف
     } finally {
       setLoading(false);
     }
