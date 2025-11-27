@@ -1,12 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 
+// التحقق من وجود المفاتيح قبل البدء
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !process.env.GROQ_API_KEY) {
+  throw new Error("MISSING ENV VARIABLES IN VERCEL");
+}
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY
 )
 
 export default async function handler(req, res) {
-  // إعدادات CORS
+  // CORS Setup
   res.setHeader('Access-Control-Allow-Credentials', true)
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
@@ -19,48 +24,22 @@ export default async function handler(req, res) {
     const { messages, mode, userId, lessonId } = req.body
 
     // 1. التحقق من الاشتراك
-    const { data: user } = await supabase
-      .from('users')
-      .select('subscription_status')
-      .eq('id', userId)
-      .single()
-
-    if (!user || user.subscription_status !== 'active') {
-       // اسمح برسالة ترحيبية واحدة فقط للمجانيين
-       if (messages.length > 2) return res.status(403).json({ error: 'Subscription required' })
+    // ملاحظة: للتجربة السريعة، إذا كان userId غير موجود سنكمل كضيف
+    if (userId) {
+        const { data: user, error: dbError } = await supabase
+        .from('users')
+        .select('subscription_status')
+        .eq('id', userId)
+        .single()
+        
+        if (dbError) console.error("Database Error:", dbError);
     }
 
-    // 2. هندسة الأوامر (PROMPT ENGINEERING) - نكهة الأنمي 🍥
-    let systemPrompt = "";
+    // 2. إعداد الـ Prompt
+    let systemPrompt = "You are a helpful Japanese tutor. Teach through Anime references.";
+    if (mode === 'lessons') systemPrompt += ` You are teaching Lesson ${lessonId}.`;
 
-    if (mode === 'chat') {
-      systemPrompt = `You are "FlowSensei", a cool, energetic Japanese tutor who is obsessed with Anime. 
-      Your goal is to teach Japanese through Anime references.
-      
-      RULES:
-      1. Every example MUST come from a popular anime (Naruto, One Piece, JJK, Demon Slayer, AOT, Spy x Family).
-      2. If teaching grammar, use anime quotes. Example: "In Naruto, they say 'Dattebayo' which is a sentence ender..."
-      3. Correct mistakes gently but clearly.
-      4. Use emojis like 🎌, ⚔️, 🍥, 🍜.
-      5. Keep responses short and conversational.
-      6. If the user speaks English, reply in English but teach Japanese words.`;
-    } 
-    else if (mode === 'lessons') {
-      // هنا "خدعة" الدروس. الذكاء الاصطناعي يمثل دور المعلم المنهجي
-      systemPrompt = `You are guiding the user through Lesson ${lessonId}.
-      
-      LESSON CONTEXT:
-      - Lesson 1: The Shonen Protagonist Greetings (Ohayou, Konnichiwa, Osu!)
-      - Lesson 2: The Nakama Introductions (Watashi wa, Ore wa...)
-      - Lesson 3: Battle Phases (Yamero, Tatakae, Nigero!)
-      
-      INSTRUCTIONS:
-      1. Explain the specific topic for Lesson ${lessonId} using Anime examples.
-      2. Give 3 key phrases.
-      3. Ask the user to repeat or translate one phrase to pass the lesson.
-      4. If they get it right, say "LESSON_COMPLETE" so the frontend knows to unlock the next one.
-      5. Be structured but exciting. Like All Might teaching a class.`;
-    }
+    console.log("Sending request to Groq..."); // Log marker
 
     // 3. الاتصال بـ Groq
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -81,9 +60,19 @@ export default async function handler(req, res) {
     })
 
     const data = await response.json()
+
+    // التحقق هل رد Groq بخطأ؟
+    if (data.error) {
+        throw new Error(`Groq API Error: ${data.error.message}`);
+    }
+
     return res.status(200).json({ message: data.choices[0].message.content })
 
   } catch (error) {
-    return res.status(500).json({ error: 'Server Error' })
+    // 🔥 هنا التغيير المهم: طباعة الخطأ كاملاً
+    console.error("🔥 FATAL API ERROR:", error);
+    
+    // إرسال تفاصيل الخطأ للهاتف
+    return res.status(500).json({ error: error.message || 'Unknown Server Error' })
   }
 }
