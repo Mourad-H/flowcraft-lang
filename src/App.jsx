@@ -16,8 +16,39 @@ export default function FlowCraftLang() {
   const scrollRef = useRef(null);
   const [view, setView] = useState('home');
 
-  // رابط Lemon Squeezy (استبدله برابطك)
-  const CHECKOUT_URL = "https://your-store.lemonsqueezy.com/checkout/buy/variant-id";
+  const handleCryptoUpgrade = async (tier = 'premium') => {
+    if (!session?.user?.id) {
+      alert("Please log in to start your upgrade.");
+      return;
+    }
+    setLoading(true);
+
+    try {
+      // Calls the serverless function to create a new NowPayments invoice
+      const response = await fetch('/api/create-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: session.user.id,
+          tier: tier
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Invoice creation failed.');
+      }
+
+      // Success: Redirect user to the NowPayments invoice URL
+      window.location.href = data.invoice_url;
+
+    } catch (error) {
+      alert("Error initiating payment: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     // التحقق من الجلسة عند بدء التشغيل
@@ -256,17 +287,46 @@ if (view === 'refund') {
             Welcome back, <span className="text-anime-primary">{session.user.user_metadata.full_name || "Shinobi"}</span>-san!
         </h1>
         
+        {/* 🛑 PAYWALL BANNER: يظهر إذا كان المستخدم مجانياً 🛑 */}
+        {userTier === 'free' && (
+            <div className="mb-8 p-6 bg-gradient-to-r from-anime-warning/20 to-orange-600/20 border-2 border-anime-warning/50 rounded-xl max-w-4xl w-full flex justify-between items-center shadow-lg">
+                <div>
+                    <p className="text-lg font-bold text-anime-warning">Access Restricted</p>
+                    <p className="text-sm text-gray-300">You have a 5-message limit. Upgrade now to unlock unlimited training! ⚔️</p>
+                </div>
+                {/* الاتصال بدالة الدفع بالعملات المشفرة */}
+                <button 
+                    onClick={() => handleCryptoUpgrade('premium')} 
+                    className="bg-anime-warning text-black font-bold px-6 py-2 rounded-lg hover:bg-yellow-300 transition shrink-0"
+                >
+                    Start Premium Training
+                </button>
+            </div>
+        )}
+
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
-          <button onClick={() => setMode('chat')} className="group relative bg-anime-card border border-anime-primary/30 p-8 rounded-2xl hover:bg-anime-card/80 transition text-left overflow-hidden">
+          {/* Chat Mode Card */}
+          <button 
+            onClick={() => setMode('chat')} 
+            disabled={userTier === 'free'} // ✅ القفل هنا (إلغاء التفعيل للـ Free)
+            className={`group relative p-8 rounded-2xl transition text-left overflow-hidden ${userTier === 'free' ? 'bg-anime-card/50 border-white/10 opacity-70 cursor-not-allowed' : 'bg-anime-card border border-anime-primary/30 hover:border-anime-accent'}`}
+          >
              <MessageCircle size={40} className="text-anime-primary mb-4" />
              <h2 className="text-2xl font-bold mb-2">Free Chat Mode</h2>
              <p className="text-gray-400">Talk to FlowSensei about any anime.</p>
+             {userTier === 'free' && <Lock className="absolute top-2 right-2 text-red-400" size={24} />} 
           </button>
 
-          <button onClick={() => setMode('lessons')} className="group relative bg-anime-card border border-anime-accent/30 p-8 rounded-2xl hover:bg-anime-card/80 transition text-left overflow-hidden">
+          {/* Lessons Mode Card */}
+          <button 
+            onClick={() => setMode('lessons')} 
+            disabled={userTier === 'free'} // ✅ القفل هنا (إلغاء التفعيل للـ Free)
+            className={`group relative p-8 rounded-2xl transition text-left overflow-hidden ${userTier === 'free' ? 'bg-anime-card/50 border-white/10 opacity-70 cursor-not-allowed' : 'bg-anime-card border border-anime-accent/30 hover:border-anime-accent'}`}
+          >
              <BookOpen size={40} className="text-anime-accent mb-4" />
              <h2 className="text-2xl font-bold mb-2">Structured Path</h2>
              <p className="text-gray-400">Follow the "Way of the Ninja" curriculum.</p>
+             {userTier === 'free' && <Lock className="absolute top-2 right-2 text-red-400" size={24} />} 
           </button>
         </div>
         
