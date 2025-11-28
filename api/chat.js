@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 
 // التحقق من وجود المفاتيح
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !process.env.GROQ_API_KEY) {
+  // هذا سيجبر Vercel على إظهار الخطأ إذا لم تكن المفاتيح موجودة
   throw new Error("MISSING ENV VARIABLES IN VERCEL");
 }
 
@@ -11,7 +12,7 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  // إعدادات CORS
+  // إعدادات CORS (لا تغيير)
   res.setHeader('Access-Control-Allow-Credentials', true)
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
@@ -23,17 +24,42 @@ export default async function handler(req, res) {
   try {
     const { messages, mode, userId, lessonId } = req.body
 
-    // 1. التحقق من المستخدم (اختياري للتجربة)
+    // 🛑 1. منطق الحد المجاني (The Paywall) 🛑
     if (userId) {
-        const { data: user, error: dbError } = await supabase
+        // جلب حالة الاشتراك
+        const { data: user, error: userError } = await supabase
         .from('users')
         .select('subscription_status')
         .eq('id', userId)
         .single()
+        
+        const subscriptionStatus = user?.subscription_status || 'pending'; // نفترض 'pending' إذا لم يكن موجوداً
+
+        if (subscriptionStatus !== 'active') {
+            const DAILY_LIMIT = 5; 
+            const today = new Date().toISOString().split('T')[0]; 
+
+            // العد اليومي
+            const { count, error } = await supabase
+                .from('conversations')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', userId)
+                .gte('created_at', today) 
+                .eq('role', 'user'); 
+
+            if (error) console.error("Limit Check Error:", error);
+            
+            if (count >= DAILY_LIMIT) {
+                // خطأ مخصص يجبر المستخدم على الترقية
+                return res.status(403).json({ error: "LIMIT_EXCEEDED" });
+            }
+        }
     }
+    // نهاية منطق الحد المجاني -- إذا وصل الكود إلى هنا، فالمستخدم إما مدفوع أو ضمن الحد
 
     // 2. هندسة الأوامر المحسنة للصوت (TTS OPTIMIZED PROMPTS) 🎤
     let systemPrompt = "";
+    // ... بقية الـ Prompts كما هي
 
     const commonRules = `
     IMPORTANT FOR TTS (TEXT TO SPEECH):
@@ -86,11 +112,13 @@ export default async function handler(req, res) {
           { role: 'system', content: systemPrompt },
           ...messages
         ],
-        temperature: 0.8, // رفعنا الحرارة قليلاً ليكون أكثر إبداعاً
+        temperature: 0.8,
         max_tokens: 600
       })
     })
-
+    
+    // ... logging conversation (Optional - we skip logging here to simplify code)
+    
     const data = await response.json()
 
     if (data.error) {

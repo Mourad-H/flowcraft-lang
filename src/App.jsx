@@ -139,7 +139,22 @@ export default function FlowCraftLang() {
 
     } catch (err) {
       console.error(err);
-      alert("Error: " + err.message);
+      
+      // هذا يحول الخطأ إلى نص يمكن قراءته
+      let errorMessage = err.message || "Unknown Error";
+
+      // 🛑 فحص الباكوول (Paywall Check) 🛑
+      if (errorMessage.includes("LIMIT_EXCEEDED")) {
+          alert("LIMIT EXCEEDED: Your free messages are done for today! Upgrade to Premium to continue your training. ⚔️");
+      } 
+      // فحص أخطاء النظام الأخرى (مثل مفتاح Groq خطأ)
+      else if (errorMessage.includes("Server Error") || errorMessage.includes("Groq API Error")) {
+          alert("SYSTEM ERROR: The AI service is currently down or requires maintenance. Please try again later.");
+      }
+      // إذا كان خطأ عادياً أو غير معروف
+      else {
+          alert("Error: " + errorMessage); 
+      }
     } finally {
       setLoading(false);
     }
