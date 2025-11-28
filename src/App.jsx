@@ -62,30 +62,53 @@ export default function FlowCraftLang() {
     setMessages([]);
   };
 
-  // ✅ إصلاح الصوت للموبايل
+  // دالة نطق ذكية ومحسنة
   const speak = (text) => {
     if (!window.speechSynthesis) {
-      alert("Text-to-speech not supported on this device.");
+      alert("Browser does not support TTS.");
       return;
     }
 
-    // إيقاف أي صوت سابق
+    // 1. تنظيف النص من الإيموجي والرموز (لأنها تخرب النطق)
+    const cleanText = text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
+
+    // إيقاف الصوت القديم
     window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ja-JP'; // محاولة فرض اليابانية
-    utterance.rate = 0.9;
-    
-    // محاولة العثور على صوت ياباني بذكاء
-    const voices = window.speechSynthesis.getVoices();
-    const japanVoice = voices.find(v => v.lang.includes('ja') || v.lang.includes('JP'));
-    
-    if (japanVoice) {
-      utterance.voice = japanVoice;
-    }
+    // 2. تحميل الأصوات (المتصفحات أحياناً تتأخر في تحميل القائمة)
+    const loadVoicesAndSpeak = () => {
+      const voices = window.speechSynthesis.getVoices();
+      
+      // نبحث عن أفضل صوت ياباني متاح
+      // الترتيب مهم: Google عادة هو الأفضل والأكثر سلاسة
+      const bestVoice = voices.find(v => v.name.includes("Google 日本語")) || 
+                        voices.find(v => v.name.includes("Microsoft")) || 
+                        voices.find(v => v.lang.includes("ja"));
 
-    // تشغيل الصوت
-    window.speechSynthesis.speak(utterance);
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      
+      if (bestVoice) {
+        utterance.voice = bestVoice;
+        utterance.lang = bestVoice.lang;
+      } else {
+        // إذا لم نجد صوتاً يابانياً، نستخدم الإنجليزي لكن نجبره على اللغة اليابانية
+        utterance.lang = 'ja-JP';
+      }
+
+      // 3. ضبط المشاعر (السرعة والحدة)
+      utterance.rate = 1.0; // السرعة الطبيعية (0.9 كان بطيئاً ويسبب التقطع في بعض الأجهزة)
+      utterance.pitch = 1.1; // رفع النبرة قليلاً لتبدو أكثر حيوية (Anime style)
+      utterance.volume = 1.0;
+
+      window.speechSynthesis.speak(utterance);
+    };
+
+    // التعامل مع مشكلة تحميل الأصوات في Chrome
+    if (window.speechSynthesis.getVoices().length === 0) {
+      window.speechSynthesis.onvoiceschanged = loadVoicesAndSpeak;
+    } else {
+      loadVoicesAndSpeak();
+    }
   };
 
   const handleSend = async () => {
