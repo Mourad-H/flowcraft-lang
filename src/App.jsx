@@ -291,12 +291,16 @@ if (view === 'refund') {
   }
 
   // 2. DASHBOARD
+  // 2. DASHBOARD
   if (!mode) {
+    // ✅ ملاحظة: نحن نستخدم '?' (Optional Chaining) لضمان عدم انهيار التطبيق إذا كان الاسم مفقوداً
+    const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Shinobi";
+
     return (
       <div className="min-h-screen bg-anime-bg text-white p-6 flex flex-col items-center justify-center">
         <h1 className="text-3xl font-bold mb-8">
-    {/* إذا كان جديداً: مرحباً بك في الدوجو. إذا كان قديماً: مرحباً بعودتك */}
-    {isNewUser ? "Welcome to the Dojo! 🥋" : "Welcome back, "}{session.user.user_metadata.full_name || "Shinobi"}-san!
+            {isNewUser ? "Welcome to the Dojo! 🥋" : "Welcome back, "}
+            <span className="text-anime-primary">{userName}</span>-san!
         </h1>
         
         {/* 🛑 PAYWALL BANNER: يظهر إذا كان المستخدم مجانياً 🛑 */}
@@ -317,10 +321,10 @@ if (view === 'refund') {
         )}
 
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
-          {/* Chat Mode Card */}
+          {/* Chat Mode Card - (بدون تغيير في المنطق) */}
           <button 
             onClick={() => setMode('chat')} 
-            disabled={userTier === 'free'} // ✅ القفل هنا (إلغاء التفعيل للـ Free)
+            disabled={userTier === 'free'} 
             className={`group relative p-8 rounded-2xl transition text-left overflow-hidden ${userTier === 'free' ? 'bg-anime-card/50 border-white/10 opacity-70 cursor-not-allowed' : 'bg-anime-card border border-anime-primary/30 hover:border-anime-accent'}`}
           >
              <MessageCircle size={40} className="text-anime-primary mb-4" />
@@ -329,10 +333,10 @@ if (view === 'refund') {
              {userTier === 'free' && <Lock className="absolute top-2 right-2 text-red-400" size={24} />} 
           </button>
 
-          {/* Lessons Mode Card */}
+          {/* Lessons Mode Card - (بدون تغيير في المنطق) */}
           <button 
             onClick={() => setMode('lessons')} 
-            disabled={userTier === 'free'} // ✅ القفل هنا (إلغاء التفعيل للـ Free)
+            disabled={userTier === 'free'}
             className={`group relative p-8 rounded-2xl transition text-left overflow-hidden ${userTier === 'free' ? 'bg-anime-card/50 border-white/10 opacity-70 cursor-not-allowed' : 'bg-anime-card border border-anime-accent/30 hover:border-anime-accent'}`}
           >
              <BookOpen size={40} className="text-anime-accent mb-4" />
