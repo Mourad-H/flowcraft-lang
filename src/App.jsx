@@ -178,14 +178,14 @@ export default function FlowCraftLang() {
     );
   }
 
-  // 🛑 0.1 منطق عرض الصفحات القانونية (يجب أن يأتي أولاً) 🛑
-  if (view === 'privacy') {
-    return <PrivacyPolicy />;
-  }
-  if (view === 'refund') {
-    return <RefundPolicy />;
-  }
-  // نهاية منطق عرض الصفحات القانونية
+  // 🛑 0.1 منطق عرض الصفحات القانونية 🛑
+if (view === 'privacy') {
+  return <PrivacyPolicy setView={setView} />; // تمرير دالة العودة
+}
+if (view === 'refund') {
+  return <RefundPolicy setView={setView} />; // تمرير دالة العودة
+}
+// نهاية منطق عرض الصفحات القانونية
 
   // 1. LANDING PAGE
   if (!session) {

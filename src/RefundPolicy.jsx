@@ -4,6 +4,12 @@ import { LogOut } from 'lucide-react';
 
 export const RefundPolicy = () => (
   <div className="min-h-screen bg-anime-bg text-white p-10 font-sans max-w-4xl mx-auto">
+    <button 
+      onClick={() => setView('home')} 
+      className="text-anime-accent hover:text-white transition mb-8 flex items-center gap-2"
+    >
+      ← Back to App
+    </button>
     <h1 className="text-4xl font-bold text-anime-primary mb-6">Refund Policy</h1>
     <p className="text-sm text-gray-500 mb-8">Last Updated: November 28, 2025</p>
 
