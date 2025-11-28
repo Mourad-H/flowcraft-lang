@@ -14,6 +14,16 @@ export default function FlowCraftLang() {
   const [loading, setLoading] = useState(false);
   const [currentLesson, setCurrentLesson] = useState(1);
   const scrollRef = useRef(null);
+  const [isNewUser, setIsNewUser] = useState(false);
+  const checkIsNewUser = async (userId) => {
+    // هذه الدالة تفحص قاعدة البيانات لعد المحادثات السابقة
+    const { count } = await supabase
+      .from('conversations')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    
+    return count === 0; // إذا كان العدد صفر، فهو جديد
+  };
   const [view, setView] = useState('home');
 
   const handleCryptoUpgrade = async (tier = 'premium') => {
@@ -55,6 +65,7 @@ export default function FlowCraftLang() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) checkSubscription(session.user.id);
+      checkIsNewUser(session.user.id).then(setIsNewUser);
       setAuthLoading(false); // ✅ انتهى التحميل
     });
 
@@ -284,7 +295,8 @@ if (view === 'refund') {
     return (
       <div className="min-h-screen bg-anime-bg text-white p-6 flex flex-col items-center justify-center">
         <h1 className="text-3xl font-bold mb-8">
-            Welcome back, <span className="text-anime-primary">{session.user.user_metadata.full_name || "Shinobi"}</span>-san!
+    {/* إذا كان جديداً: مرحباً بك في الدوجو. إذا كان قديماً: مرحباً بعودتك */}
+    {isNewUser ? "Welcome to the Dojo! 🥋" : "Welcome back, "}{session.user.user_metadata.full_name || "Shinobi"}-san!
         </h1>
         
         {/* 🛑 PAYWALL BANNER: يظهر إذا كان المستخدم مجانياً 🛑 */}

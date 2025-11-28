@@ -26,34 +26,52 @@ export default async function handler(req, res) {
 
     // 🛑 1. منطق الحد المجاني (The Paywall) 🛑
     if (userId) {
-        // جلب حالة الاشتراك
-        const { data: user, error: userError } = await supabase
+        // 🛑 ابحث عن منطق التحقق من الاشتراك القديم واستبدله بالكامل بهذا الكود 🛑
+
+    // 1. جلب بيانات المستخدم للتحقق من انتهاء الصلاحية
+    const { data: user, error: userError } = await supabase
         .from('users')
-        .select('subscription_status')
+        .select('subscription_status, subscription_ends_at') // جلب عمود انتهاء الصلاحية
         .eq('id', userId)
-        .single()
+        .single();
+    
+    if (userError) {
+        console.error("User fetch error:", userError);
+        // نواصل بوضع مجاني إذا فشل جلب بيانات المستخدم
+    }
+
+    // 2. التحقق من انتهاء الصلاحية (Expiration Check)
+    if (user && user.subscription_ends_at && new Date(user.subscription_ends_at) < new Date()) {
+        // إذا انتهت صلاحية الاشتراك، نغير الحالة ونرد بخطأ
+        await supabase.from('users').update({ subscription_status: 'expired' }).eq('id', userId);
+        return res.status(403).json({ error: "SUBSCRIPTION_EXPIRED" }); 
+    }
+    
+    // تحديد حالة الاشتراك بناءً على البيانات: إذا لم يكن هناك مستخدم، فالحالة 'free'
+    const subscriptionStatus = user?.subscription_status || 'free'; 
+
+    // 🛑 3. منطق الحد المجاني (3 رسائل فقط للمستخدمين غير المشتركين)
+    if (subscriptionStatus !== 'active') {
+        const DAILY_LIMIT = 3; // ✅ الحد المجاني الجديد: 3 رسائل فقط
+        const today = new Date().toISOString().split('T')[0]; // تاريخ اليوم فقط
+
+        // نعد رسائل المستخدم لهذا اليوم (فقط الرسائل التي أرسلها المستخدم 'role: user')
+        const { count, error: countError } = await supabase
+            .from('conversations')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gte('created_at', today) 
+            .eq('role', 'user'); 
+
+        if (countError) console.error("Limit Check Error:", countError);
         
-        const subscriptionStatus = user?.subscription_status || 'pending'; // نفترض 'pending' إذا لم يكن موجوداً
-
-        if (subscriptionStatus !== 'active') {
-            const DAILY_LIMIT = 5; 
-            const today = new Date().toISOString().split('T')[0]; 
-
-            // العد اليومي
-            const { count, error } = await supabase
-                .from('conversations')
-                .select('*', { count: 'exact', head: true })
-                .eq('user_id', userId)
-                .gte('created_at', today) 
-                .eq('role', 'user'); 
-
-            if (error) console.error("Limit Check Error:", error);
-            
-            if (count >= DAILY_LIMIT) {
-                // خطأ مخصص يجبر المستخدم على الترقية
-                return res.status(403).json({ error: "LIMIT_EXCEEDED" });
-            }
+        if (count >= DAILY_LIMIT) {
+            // خطأ مخصص يخبر الواجهة الأمامية بضرورة الترقية
+            return res.status(403).json({ error: "UPGRADE_REQUIRED" });
         }
+    }
+    
+// 🛑 هنا ينتهي منطق التحقق، ويستمر باقي الكود في الملف (كود استدعاء OpenAI) 🛑
     }
     // نهاية منطق الحد المجاني -- إذا وصل الكود إلى هنا، فالمستخدم إما مدفوع أو ضمن الحد
 

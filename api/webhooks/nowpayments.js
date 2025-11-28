@@ -18,17 +18,23 @@ export default async function handler(req, res) {
 
   // 2. تفعيل الاشتراك عند النجاح
   if (paymentStatus === 'finished') {
-    const { error } = await supabaseAdmin.from('users')
-      .update({ subscription_status: 'active', subscription_tier: 'premium' })
-      .eq('id', passedUserId); // استخدام الـ ID الممرر
+      // ✅ التعديل: تفعيل الحساب وتعيين تاريخ انتهاء الاشتراك (بعد شهر)
+      const { error } = await supabaseAdmin.from('users')
+        .update({ 
+            subscription_status: 'active', 
+            subscription_tier: 'premium',
+            subscription_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // شهر واحد
+        })
+        .eq('id', passedUserId);
 
-    if (error) {
-      console.error('Supabase Update Error:', error);
-      return res.status(500).json({ error: 'Database update failed' });
+      if (error) {
+        console.error('Supabase Update Error:', error);
+        return res.status(500).json({ error: 'Database update failed' });
+      }
+
+      console.log(`✅ User ${passedUserId} Activated via NowPayments`);
+      return res.status(200).json({ status: 'user activated' });
     }
-
-    return res.status(200).json({ status: 'user activated' });
-  }
 
   // 3. معالجة الحالات الأخرى (مثل 'waiting', 'failed', 'refunded')
 
