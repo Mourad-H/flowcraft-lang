@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { Zap, MessageCircle, BookOpen, Lock, Star, ChevronRight, Send, Volume2, LogOut } from 'lucide-react';
+import { PrivacyPolicy } from './PrivacyPolicy'; // تأكد أن الاسم مطابق لاسم المكون
+import { RefundPolicy } from './RefundPolicy';   // تأكد أن الاسم مطابق لاسم المكون
 
 export default function FlowCraftLang() {
   const [session, setSession] = useState(null);
@@ -12,6 +14,7 @@ export default function FlowCraftLang() {
   const [loading, setLoading] = useState(false);
   const [currentLesson, setCurrentLesson] = useState(1);
   const scrollRef = useRef(null);
+  const [view, setView] = useState<'home' | 'privacy' | 'refund'>('home'); 
 
   // رابط Lemon Squeezy (استبدله برابطك)
   const CHECKOUT_URL = "https://your-store.lemonsqueezy.com/checkout/buy/variant-id";
@@ -175,6 +178,15 @@ export default function FlowCraftLang() {
     );
   }
 
+  // 🛑 0.1 منطق عرض الصفحات القانونية (يجب أن يأتي أولاً) 🛑
+  if (view === 'privacy') {
+    return <PrivacyPolicy />;
+  }
+  if (view === 'refund') {
+    return <RefundPolicy />;
+  }
+  // نهاية منطق عرض الصفحات القانونية
+
   // 1. LANDING PAGE
   if (!session) {
     return (
@@ -210,10 +222,27 @@ export default function FlowCraftLang() {
           </button>
 
           {/* Legal Footer */}
-          <footer className="mt-20 text-gray-500 text-sm flex gap-4">
-             <a href="#" className="hover:text-white">Privacy</a>
-             <a href="#" className="hover:text-white">Terms</a>
-          </footer>
+          // ... في نهاية قسم LANDING PAGE ...
+<footer className="bg-black/30 backdrop-blur py-12 border-t border-white/5">
+  <div className="max-w-7xl mx-auto px-6 text-center text-gray-400">
+    <p className="mb-4">© 2025 FlowCraftLang. The Anime Way.</p>
+    <div className="flex gap-6 justify-center text-sm">
+      <button 
+        onClick={() => setView('privacy')} 
+        className="hover:text-white transition"
+      >
+        Privacy Policy
+      </button>
+      <button 
+        onClick={() => setView('refund')} 
+        className="hover:text-white transition"
+      >
+        Refund Policy
+      </button>
+      <a href="mailto:support@flowcraftlang.com" className="hover:text-white">Contact</a>
+    </div>
+  </div>
+</footer>
         </div>
       </div>
     );
