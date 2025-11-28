@@ -2,7 +2,7 @@
 import React from 'react';
 import { LogOut } from 'lucide-react'; 
 
-export const RefundPolicy = () => (
+export const RefundPolicy = ({ setView }) => (
   <div className="min-h-screen bg-anime-bg text-white p-10 font-sans max-w-4xl mx-auto">
     <button 
       onClick={() => setView('home')} 

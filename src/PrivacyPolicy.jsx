@@ -1,7 +1,7 @@
 // src/PrivacyPolicy.jsx
 import React from 'react';
 
-export const PrivacyPolicy = () => (
+export const PrivacyPolicy = ({ setView }) => (
   <div className="min-h-screen bg-anime-bg text-white p-10 font-sans max-w-4xl mx-auto">
     <button 
       onClick={() => setView('home')} 
