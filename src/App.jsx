@@ -304,7 +304,7 @@ if (view === 'refund') {
             <div className="mb-8 p-6 bg-gradient-to-r from-anime-warning/20 to-orange-600/20 border-2 border-anime-warning/50 rounded-xl max-w-4xl w-full flex justify-between items-center shadow-lg">
                 <div>
                     <p className="text-lg font-bold text-anime-warning">Access Restricted</p>
-                    <p className="text-sm text-gray-300">You have a 5-message limit. Upgrade now to unlock unlimited training! ⚔️</p>
+                    <p className="text-sm text-gray-300">You have a 3-message limit. Upgrade now to unlock unlimited training! ⚔️</p>
                 </div>
                 {/* الاتصال بدالة الدفع بالعملات المشفرة */}
                 <button 

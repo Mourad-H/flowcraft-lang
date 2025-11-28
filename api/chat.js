@@ -23,6 +23,11 @@ export default async function handler(req, res) {
 
   try {
     const { messages, mode, userId, lessonId } = req.body
+    // 🛑 1. تأكيد وجود هوية المستخدم (CRITICAL FIX)
+    if (!userId) {
+        // إذا كان المستخدم مجهولاً، نتوقف ونطلب الدخول
+        return res.status(401).json({ error: "USER_ID_MISSING" });
+    }
 
     // 🛑 1. منطق الحد المجاني (The Paywall) 🛑
     if (userId) {
