@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         price_amount: price,
         price_currency: 'usd',
-        pay_currency: 'usdt', // الزبون سيدفع بـ USDT
+        pay_currency: 'usdc', // الزبون سيدفع بـ USDT
         order_id: orderId,
         ipn_callback_url: callbackUrl, // رابط Webhook
         // تمرير الـ User ID سراً في حقل الـ 'extra'
