@@ -222,7 +222,7 @@ export default function FlowCraftLang() {
           </button>
 
           {/* Legal Footer */}
-          // ... في نهاية قسم LANDING PAGE ...
+
 <footer className="bg-black/30 backdrop-blur py-12 border-t border-white/5">
   <div className="max-w-7xl mx-auto px-6 text-center text-gray-400">
     <p className="mb-4">© 2025 FlowCraftLang. The Anime Way.</p>
