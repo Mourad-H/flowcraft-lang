@@ -14,7 +14,7 @@ export default function FlowCraftLang() {
   const [loading, setLoading] = useState(false);
   const [currentLesson, setCurrentLesson] = useState(1);
   const scrollRef = useRef(null);
-  const [view, setView] = useState<'home' | 'privacy' | 'refund'>('home'); 
+  const [view, setView] = useState('home');
 
   // رابط Lemon Squeezy (استبدله برابطك)
   const CHECKOUT_URL = "https://your-store.lemonsqueezy.com/checkout/buy/variant-id";
