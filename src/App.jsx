@@ -93,9 +93,47 @@ export default function FlowCraftLang() {
   }, [messages]);
 
   const checkSubscription = async (userId) => {
-    // يمكنك هنا التحقق من قاعدة البيانات
-    // للتجربة سنجعله دائماً free إلا إذا عدلته يدوياً
-    setUserTier('free'); 
+    if (!userId) {
+        setUserTier('free'); // تعيين حالة مجانية افتراضية إذا كان الـ ID مفقودًا
+        return;
+    }
+    
+    // 1. محاولة جلب حالة الاشتراك من جدول users
+    const { data: userData, error } = await supabase
+        .from('users')
+        .select('subscription_status')
+        .eq('id', userId)
+        .single();
+    
+    // إذا كان هناك خطأ في الجلب ولكن ليس بسبب عدم وجود الصف (No row found)
+    if (error && error.code !== 'PGRST116') { 
+        console.error("Subscription check error:", error);
+        setUserTier('free'); // العودة للحالة المجانية كإجراء أمان
+        return;
+    }
+
+    if (userData) {
+        // إذا وجدنا الصف، نحدد حالة الاشتراك منه
+        setUserTier(userData.subscription_status || 'free');
+    } else {
+        // 🛑 2. إذا لم نجد الصف (مستخدم جديد)، نفرض إنشاءه فوراً (الحل النهائي لمشكلة اللوب)
+        try {
+            const { error: insertError } = await supabase
+                .from('users')
+                .insert([{ id: userId, subscription_status: 'free' }])
+                .select(); 
+            
+            if (insertError) throw insertError;
+
+            setUserTier('free'); // الصف أنشئ، المستخدم مجاني
+            console.log("Forced user row creation success.");
+
+        } catch (insertError) {
+            // تجاهل خطأ "الصف موجود بالفعل" (ON CONFLICT) واعتبره حراً
+            console.error("Forced row insertion failed (probably conflict):", insertError);
+            setUserTier('free');
+        }
+    }
   };
 
   const handleLogin = async () => {
