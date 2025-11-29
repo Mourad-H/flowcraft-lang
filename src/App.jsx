@@ -1,196 +1,114 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { Zap, MessageCircle, BookOpen, Lock, Star, ChevronRight, Send, Volume2, LogOut } from 'lucide-react';
-import { PrivacyPolicy } from './PrivacyPolicy'; // تأكد أن الاسم مطابق لاسم المكون
-import { RefundPolicy } from './RefundPolicy';   // تأكد أن الاسم مطابق لاسم المكون
+import { PrivacyPolicy } from './PrivacyPolicy'; 
+import { RefundPolicy } from './RefundPolicy';
 
 export default function FlowCraftLang() {
+  // ----------------------------------------------------
+  // 1. ALL HOOKS / STATE DEFINITIONS (يجب أن تكون أولاً)
+  // ----------------------------------------------------
   const [session, setSession] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true); // ✅ إصلاح اللابتوب: شاشة تحميل
+  const [authLoading, setAuthLoading] = useState(true); 
   const [userTier, setUserTier] = useState('free');
   const [mode, setMode] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentLesson, setCurrentLesson] = useState(1);
-  const scrollRef = useRef(null);
   const [isNewUser, setIsNewUser] = useState(false);
+  const [view, setView] = useState('home');
+  // Final Auth States
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authMessage, setAuthMessage] = useState('');
+  const [isEmailSent, setIsEmailSent] = useState(false); // هذا لم يعد مستخدماً لكن نتركه
+  const [isLoginView, setIsLoginView] = useState(true);
+  const scrollRef = useRef(null); // useRef هو أيضاً Hook
+
+
+  // ----------------------------------------------------
+  // 2. HELPER FUNCTIONS (الدوال والمنطق)
+  // ----------------------------------------------------
+
   const checkIsNewUser = async (userId) => {
-    // هذه الدالة تفحص قاعدة البيانات لعد المحادثات السابقة
     const { count } = await supabase
       .from('conversations')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId);
-    
-    return count === 0; // إذا كان العدد صفر، فهو جديد
+    return count === 0;
   };
-  const [view, setView] = useState('home');
-
-  const handleCryptoUpgrade = async (tier = 'premium') => {
-    if (!session?.user?.id) {
-      alert("Please log in to start your upgrade.");
-      return;
-    }
-    setLoading(true);
-
-    try {
-      // Calls the serverless function to create a new NowPayments invoice
-      const response = await fetch('/api/create-invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: session.user.id,
-          tier: tier
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || data.error) {
-        throw new Error(data.error || 'Invoice creation failed.');
-      }
-
-      // Success: Redirect user to the NowPayments invoice URL
-      window.location.href = data.invoice_url;
-
-    } catch (error) {
-      alert("Error initiating payment: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
- useEffect(() => {
-    // التحقق من الجلسة عند بدء التشغيل
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      
-      // ✅ التحصين: التأكد من وجود جلسة ومستخدم قبل بدء استدعاء الداتابيس
-      if (session && session.user) { 
-        checkSubscription(session.user.id);
-        checkIsNewUser(session.user.id).then(setIsNewUser);
-      }
-      setAuthLoading(false); // انتهى التحقق
-    });
-
-    // الاستماع للتغييرات
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      
-      // ✅ التحصين هنا أيضاً
-      if (session && session.user) {
-        checkSubscription(session.user.id);
-        checkIsNewUser(session.user.id).then(setIsNewUser);
-      }
-      setAuthLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
 
   const checkSubscription = async (userId) => {
-    if (!userId) {
-        setUserTier('free'); // تعيين حالة مجانية افتراضية إذا كان الـ ID مفقودًا
-        return;
-    }
+    // هذه الدالة الآن قوية وتفرض إنشاء الصف إذا كان مفقوداً
+    if (!userId) { setUserTier('free'); return; }
     
-    // 1. محاولة جلب حالة الاشتراك من جدول users
     const { data: userData, error } = await supabase
         .from('users')
         .select('subscription_status')
         .eq('id', userId)
         .single();
     
-    // إذا كان هناك خطأ في الجلب ولكن ليس بسبب عدم وجود الصف (No row found)
-    if (error && error.code !== 'PGRST116') { 
-        console.error("Subscription check error:", error);
-        setUserTier('free'); // العودة للحالة المجانية كإجراء أمان
-        return;
-    }
+    if (error && error.code !== 'PGRST116') { setUserTier('free'); return; }
 
     if (userData) {
-        // إذا وجدنا الصف، نحدد حالة الاشتراك منه
         setUserTier(userData.subscription_status || 'free');
     } else {
-        // 🛑 2. إذا لم نجد الصف (مستخدم جديد)، نفرض إنشاءه فوراً (الحل النهائي لمشكلة اللوب)
+        // فرض إنشاء الصف (Fixing the Trigger failure)
         try {
-            const { error: insertError } = await supabase
-                .from('users')
-                .insert([{ id: userId, subscription_status: 'free' }])
-                .select(); 
-            
-            if (insertError) throw insertError;
-
-            setUserTier('free'); // الصف أنشئ، المستخدم مجاني
-            console.log("Forced user row creation success.");
-
-        } catch (insertError) {
-            // تجاهل خطأ "الصف موجود بالفعل" (ON CONFLICT) واعتبره حراً
-            console.error("Forced row insertion failed (probably conflict):", insertError);
+            await supabase.from('users').insert([{ id: userId, subscription_status: 'free' }]).select(); 
             setUserTier('free');
+        } catch (insertError) {
+            setUserTier('free'); 
         }
     }
   };
 
-  const handleLogin = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin }
-      });
-      if (error) throw error;
-    } catch (error) {
-      alert("Login Error: " + error.message);
-    }
-  };
+  const handleAuthSubmit = async (isSignUp) => {
+      if (!email || !password) return;
+      setLoading(true);
+      setAuthMessage('');
 
+      let result;
+      if (isSignUp) {
+        result = await supabase.auth.signUp({ email, password });
+      } else {
+        result = await supabase.auth.signInWithPassword({ email, password });
+      }
+
+      if (result.error) {
+          setAuthMessage(result.error.message);
+          setSession(null);
+      } else if (!isSignUp) {
+        // Login Success (listener handles the session)
+      } else {
+        setAuthMessage("Signup successful! Please check your email for confirmation.");
+      }
+      setLoading(false);
+  };
+  
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setMode(null);
     setMessages([]);
   };
 
-  // دالة نطق فائقة الذكاء (TTS Final Fix)
   const speak = (text) => {
-    if (!window.speechSynthesis) {
-      console.error("Browser does not support TTS.");
-      return;
-    }
-
-    // تنظيف النص من الإيموجي أو الرموز التي تخرب النطق
+    // ... (دالة TTS المحسنة)
+    if (!window.speechSynthesis) { console.error("Browser does not support TTS."); return; }
     const cleanText = text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
-
     window.speechSynthesis.cancel();
-    
-    // محاولة العثور على صوت ياباني عالي الجودة
     const voices = window.speechSynthesis.getVoices();
     const japanVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || 
                        voices.find(v => v.lang === 'ja-JP');
-
     const utterance = new SpeechSynthesisUtterance(cleanText);
-
-    if (japanVoice) {
-      utterance.voice = japanVoice;
-      utterance.lang = 'ja-JP'; 
-    } else {
-      // إذا لم نجد صوتاً مخصصاً، نترك المتصفح يختار الصوت الافتراضي 
-      // لكننا نجبر اللغة على ja-JP لزيادة فرصة النطق الصحيح لـ Kana/Kanji.
-      utterance.lang = 'ja-JP';
-    }
-
-    // ضبط المشاعر/السرعة
-    utterance.rate = 1.0; 
-    utterance.pitch = 1.1; 
-
-    // إطلاق الصوت (قد يتطلب ضغط المستخدم على زر "Pronounce" في الموبايل أولاً)
+    if (japanVoice) { utterance.voice = japanVoice; utterance.lang = 'ja-JP'; } else { utterance.lang = 'ja-JP'; }
+    utterance.rate = 1.0; utterance.pitch = 1.1;
     window.speechSynthesis.speak(utterance);
   };
 
   const handleSend = async () => {
+    // ... (دالة إرسال الرسالة والـ Limit Check)
     if (!input.trim() || loading) return;
 
     const userMsg = { role: 'user', content: input };
@@ -212,39 +130,26 @@ export default function FlowCraftLang() {
 
       const data = await res.json();
 
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Server Error");
-      }
+      if (!res.ok || data.error) { throw new Error(data.error || "Server Error"); }
 
       const aiMsgContent = data.message || "Error: No response";
       
-      // إضافة رد الـ AI
       if (aiMsgContent.includes("LESSON_COMPLETE")) {
          const cleanMsg = aiMsgContent.replace("LESSON_COMPLETE", "");
          setMessages(prev => [...prev, { role: 'assistant', content: cleanMsg + "\n\n🎉 Level Up!" }]);
-         setCurrentLesson(prev => prev + 1);
-         speak(cleanMsg); // نطق الرد تلقائياً
+         setCurrentLesson(prev => currentLesson + 1); // fix: use currentLesson + 1
+         speak(cleanMsg);
       } else {
          setMessages(prev => [...prev, { role: 'assistant', content: aiMsgContent }]);
-         // ملاحظة: المتصفحات قد تمنع النطق التلقائي هنا، لذا يوجد زر Pronounce
       }
 
     } catch (err) {
-      console.error(err);
-      
-      // هذا يحول الخطأ إلى نص يمكن قراءته
       let errorMessage = err.message || "Unknown Error";
-
-      // 🛑 فحص الباكوول (Paywall Check) 🛑
       if (errorMessage.includes("LIMIT_EXCEEDED")) {
-          alert("LIMIT EXCEEDED: Your free messages are done for today! Upgrade to Premium to continue your training. ⚔️");
-      } 
-      // فحص أخطاء النظام الأخرى (مثل مفتاح Groq خطأ)
-      else if (errorMessage.includes("Server Error") || errorMessage.includes("Groq API Error")) {
-          alert("SYSTEM ERROR: The AI service is currently down or requires maintenance. Please try again later.");
-      }
-      // إذا كان خطأ عادياً أو غير معروف
-      else {
+          alert("LIMIT EXCEEDED: Your 3 free messages are done for today! Upgrade to Premium to continue your training. ⚔️");
+      } else if (errorMessage.includes("Server Error") || errorMessage.includes("Groq API Error")) {
+          alert("SYSTEM ERROR: The AI service is currently down or requires maintenance.");
+      } else {
           alert("Error: " + errorMessage); 
       }
     } finally {
@@ -252,12 +157,64 @@ export default function FlowCraftLang() {
     }
   };
 
-  const openLemonSqueezy = () => {
-    const url = `${CHECKOUT_URL}?checkout[email]=${session?.user.email}`;
-    window.location.href = url;
+  const handleCryptoUpgrade = async (tier = 'premium') => {
+    // ... (دالة إنشاء الفاتورة)
+    if (!session?.user?.id) { alert("Please log in first."); return; }
+    setLoading(true);
+    try {
+      const response = await fetch('/api/create-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: session.user.id, tier: tier })
+      });
+      const data = await response.json();
+      if (!response.ok || data.error) { throw new Error(data.error || 'Invoice creation failed.'); }
+      window.location.href = data.invoice_url;
+    } catch (error) {
+      alert("Error creating invoice: " + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // 0. LOADING SCREEN (الحل لمشكلة اللابتوب)
+  // ----------------------------------------------------
+  // 3. EFFECT HOOKS (التحقق من الجلسة)
+  // ----------------------------------------------------
+
+  useEffect(() => {
+    // التحقق من الجلسة عند بدء التشغيل
+    const handleAuthCheck = async (initialSession) => {
+        if (initialSession && initialSession.user) {
+            await checkSubscription(initialSession.user.id);
+            await checkIsNewUser(initialSession.user.id).then(setIsNewUser);
+        }
+        setAuthLoading(false);
+    }
+    
+    // 1. Initial load check (الحصول على الجلسة من الذاكرة)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      handleAuthCheck(session);
+    });
+
+    // 2. Listener for state changes (login/logout/token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) handleAuthCheck(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // ----------------------------------------------------
+  // 4. RENDERING LOGIC (منطق العرض)
+  // ----------------------------------------------------
+
+  // 0. LOADING SCREEN 
   if (authLoading) {
     return (
       <div className="min-h-screen bg-anime-bg flex flex-col items-center justify-center text-white">
@@ -267,41 +224,13 @@ export default function FlowCraftLang() {
     );
   }
 
-  // 🛑 0.1 منطق عرض الصفحات القانونية 🛑
-if (view === 'privacy') {
-  return <PrivacyPolicy setView={setView} />; // تمرير دالة العودة
-}
-if (view === 'refund') {
-  return <RefundPolicy setView={setView} />; // تمرير دالة العودة
-}
-// نهاية منطق عرض الصفحات القانونية
+  // 0.1 منطق عرض الصفحات القانونية 
+if (view === 'privacy') { return <PrivacyPolicy setView={setView} />; }
+if (view === 'refund') { return <RefundPolicy setView={setView} />; }
 
- // 1. LANDING PAGE
+  // 1. LANDING PAGE (Email/Password Form)
   if (!session) {
-    // حالة للإيميل
-    const [email, setEmail] = useState('');
-    const [authMessage, setAuthMessage] = useState('');
-    const [isEmailSent, setIsEmailSent] = useState(false);
-
-    const handleMagicLinkLogin = async () => {
-        if (!email) return;
-        setAuthLoading(true);
-
-        const { error } = await supabase.auth.signInWithOtp({
-            email: email,
-            options: {
-                emailRedirectTo: window.location.origin, // التوجيه للموقع الحي
-            }
-        });
-
-        if (error) {
-            setAuthMessage(error.message);
-        } else {
-            setIsEmailSent(true);
-            setAuthMessage('Magic Link sent! Check your inbox 🚀');
-        }
-        setAuthLoading(false);
-    };
+    // يتم استخدام المتغيرات الخارجية email, password, authMessage التي تم تعريفها في الأعلى
 
     return (
       <div className="min-h-screen bg-anime-bg text-white font-sans selection:bg-anime-accent selection:text-white">
@@ -313,11 +242,10 @@ if (view === 'refund') {
             </span>
           </div>
           <button 
-             onClick={handleMagicLinkLogin} 
-             disabled={authLoading}
+             onClick={() => setIsLoginView(!isLoginView)} 
              className="bg-white text-anime-bg px-6 py-2 rounded-full font-bold hover:scale-105 transition"
           >
-            {authLoading ? 'Sending...' : 'Start Training'}
+            {isLoginView ? 'Sign Up' : 'Log In'}
           </button>
         </nav>
 
@@ -330,54 +258,38 @@ if (view === 'refund') {
           </h1>
           
           <div className="max-w-md w-full mt-10 p-6 bg-anime-card rounded-xl border border-white/10 shadow-xl">
-            <h2 className="text-2xl font-bold mb-4">Login or Sign Up</h2>
+            <h2 className="text-2xl font-bold mb-4">{isLoginView ? 'Log In' : 'Create Account'}</h2>
             
-            {!isEmailSent ? (
-              <div className="flex flex-col gap-4">
-                <input
-                  type="email"
-                  placeholder="Enter your Email (Required)"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full p-3 rounded-lg text-black focus:ring-anime-primary outline-none"
-                  onKeyDown={(e) => e.key === 'Enter' && handleMagicLinkLogin()}
-                />
-                <button 
-                  onClick={handleMagicLinkLogin} 
-                  disabled={authLoading || !email}
-                  className="bg-anime-primary text-black font-bold py-3 rounded-lg hover:bg-cyan-400 transition"
-                >
-                  Get Magic Link 🚀
-                </button>
-                {authMessage && <p className="text-red-400 text-sm">{authMessage}</p>}
-              </div>
-            ) : (
-              <p className="text-anime-warning font-bold">{authMessage}</p>
-            )}
+            <div className="flex flex-col gap-4">
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full p-3 rounded-lg text-black focus:ring-anime-primary outline-none"
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full p-3 rounded-lg text-black focus:ring-anime-primary outline-none"
+              />
+              <button 
+                onClick={() => handleAuthSubmit(!isLoginView)} 
+                disabled={loading || !email || !password}
+                className="bg-anime-primary text-black font-bold py-3 rounded-lg hover:bg-cyan-400 transition"
+              >
+                {isLoginView ? 'Log In' : 'Sign Up'} 🚀
+              </button>
+              {authMessage && <p className="text-red-400 text-sm mt-2">{authMessage}</p>}
+            </div>
           </div>
 
-          {/* Legal Footer */}
-
-<footer className="bg-black/30 backdrop-blur py-12 border-t border-white/5">
-  <div className="max-w-7xl mx-auto px-6 text-center text-gray-400">
-    <p className="mb-4">© 2025 FlowCraftLang. The Anime Way.</p>
-    <div className="flex gap-6 justify-center text-sm">
-      <button 
-        onClick={() => setView('privacy')} 
-        className="hover:text-white transition"
-      >
-        Privacy Policy
-      </button>
-      <button 
-        onClick={() => setView('refund')} 
-        className="hover:text-white transition"
-      >
-        Refund Policy
-      </button>
-      <a href="mailto:support@flowcraftlang.com" className="hover:text-white">Contact</a>
-    </div>
-  </div>
-</footer>
+          <footer className="mt-20 text-gray-500 text-sm flex gap-4">
+            <a href="#" onClick={() => setView('privacy')} className="hover:text-white">Privacy</a>
+            <a href="#" onClick={() => setView('refund')} className="hover:text-white">Terms</a>
+          </footer>
         </div>
       </div>
     );
@@ -385,7 +297,7 @@ if (view === 'refund') {
 
   // 2. DASHBOARD
   if (!mode) {
-    // ✅ ملاحظة: نحن نستخدم '?' (Optional Chaining) لضمان عدم انهيار التطبيق إذا كان الاسم مفقوداً
+    // ... (rest of the dashboard logic)
     const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Shinobi";
 
     return (
@@ -413,7 +325,7 @@ if (view === 'refund') {
         )}
 
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
-          {/* Chat Mode Card - (بدون تغيير في المنطق) */}
+          {/* Chat Mode Card - (الآن يجب أن تكون قادرة على النقر) */}
           <button 
             onClick={() => setMode('chat')} 
             disabled={userTier === 'free'} 
@@ -425,7 +337,7 @@ if (view === 'refund') {
              {userTier === 'free' && <Lock className="absolute top-2 right-2 text-red-400" size={24} />} 
           </button>
 
-          {/* Lessons Mode Card - (بدون تغيير في المنطق) */}
+          {/* Lessons Mode Card */}
           <button 
             onClick={() => setMode('lessons')} 
             disabled={userTier === 'free'}
@@ -473,7 +385,7 @@ if (view === 'refund') {
           <h2 className="font-bold text-lg">
             {mode === 'chat' ? 'Free Chat Mode 💬' : `Training Level ${currentLesson} ⚔️`}
           </h2>
-          {userTier === 'free' && <button onClick={openLemonSqueezy} className="text-xs bg-anime-warning text-black px-3 py-1 rounded font-bold">UPGRADE</button>}
+          {userTier === 'free' && <button onClick={() => handleCryptoUpgrade('premium')} className="text-xs bg-anime-warning text-black px-3 py-1 rounded font-bold">UPGRADE</button>}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
