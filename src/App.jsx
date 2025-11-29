@@ -276,8 +276,33 @@ if (view === 'refund') {
 }
 // نهاية منطق عرض الصفحات القانونية
 
-  // 1. LANDING PAGE
+ // 1. LANDING PAGE
   if (!session) {
+    // حالة للإيميل
+    const [email, setEmail] = useState('');
+    const [authMessage, setAuthMessage] = useState('');
+    const [isEmailSent, setIsEmailSent] = useState(false);
+
+    const handleMagicLinkLogin = async () => {
+        if (!email) return;
+        setAuthLoading(true);
+
+        const { error } = await supabase.auth.signInWithOtp({
+            email: email,
+            options: {
+                emailRedirectTo: window.location.origin, // التوجيه للموقع الحي
+            }
+        });
+
+        if (error) {
+            setAuthMessage(error.message);
+        } else {
+            setIsEmailSent(true);
+            setAuthMessage('Magic Link sent! Check your inbox 🚀');
+        }
+        setAuthLoading(false);
+    };
+
     return (
       <div className="min-h-screen bg-anime-bg text-white font-sans selection:bg-anime-accent selection:text-white">
         <nav className="p-6 flex justify-between items-center max-w-7xl mx-auto">
@@ -287,28 +312,49 @@ if (view === 'refund') {
               FlowCraftLang
             </span>
           </div>
-          <button onClick={handleLogin} className="bg-white text-anime-bg px-6 py-2 rounded-full font-bold hover:scale-105 transition shadow-[0_0_15px_rgba(255,255,255,0.5)]">
-            Login with Google
+          <button 
+             onClick={handleMagicLinkLogin} 
+             disabled={authLoading}
+             className="bg-white text-anime-bg px-6 py-2 rounded-full font-bold hover:scale-105 transition"
+          >
+            {authLoading ? 'Sending...' : 'Start Training'}
           </button>
         </nav>
 
         <div className="flex flex-col items-center justify-center mt-20 px-4 text-center">
-          <div className="inline-block px-4 py-1 mb-6 rounded-full border border-anime-accent/50 bg-anime-accent/10 text-anime-accent text-sm font-bold animate-pulse">
-            🎌 For Anime Fans Only
-          </div>
           <h1 className="text-5xl md:text-7xl font-black mb-6 leading-tight">
             Learn Japanese <br/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-anime-warning to-anime-accent">
               The Shonen Way
             </span>
           </h1>
-          <p className="text-gray-400 text-xl max-w-2xl mb-10">
-            Forget boring textbooks. Learn the language of Naruto. 
-            Real anime dialogues, infinite AI roleplay.
-          </p>
-          <button onClick={handleLogin} className="bg-gradient-to-r from-anime-accent to-purple-600 px-10 py-4 rounded-xl font-bold text-xl hover:shadow-[0_0_30px_rgba(244,114,182,0.6)] transition transform hover:-translate-y-1">
-            Start Your Training ⚔️
-          </button>
+          
+          <div className="max-w-md w-full mt-10 p-6 bg-anime-card rounded-xl border border-white/10 shadow-xl">
+            <h2 className="text-2xl font-bold mb-4">Login or Sign Up</h2>
+            
+            {!isEmailSent ? (
+              <div className="flex flex-col gap-4">
+                <input
+                  type="email"
+                  placeholder="Enter your Email (Required)"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full p-3 rounded-lg text-black focus:ring-anime-primary outline-none"
+                  onKeyDown={(e) => e.key === 'Enter' && handleMagicLinkLogin()}
+                />
+                <button 
+                  onClick={handleMagicLinkLogin} 
+                  disabled={authLoading || !email}
+                  className="bg-anime-primary text-black font-bold py-3 rounded-lg hover:bg-cyan-400 transition"
+                >
+                  Get Magic Link 🚀
+                </button>
+                {authMessage && <p className="text-red-400 text-sm">{authMessage}</p>}
+              </div>
+            ) : (
+              <p className="text-anime-warning font-bold">{authMessage}</p>
+            )}
+          </div>
 
           {/* Legal Footer */}
 
