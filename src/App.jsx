@@ -60,19 +60,28 @@ export default function FlowCraftLang() {
     }
   };
 
-  useEffect(() => {
+ useEffect(() => {
     // التحقق من الجلسة عند بدء التشغيل
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) checkSubscription(session.user.id);
-      checkIsNewUser(session.user.id).then(setIsNewUser);
-      setAuthLoading(false); // ✅ انتهى التحميل
+      
+      // ✅ التحصين: التأكد من وجود جلسة ومستخدم قبل بدء استدعاء الداتابيس
+      if (session && session.user) { 
+        checkSubscription(session.user.id);
+        checkIsNewUser(session.user.id).then(setIsNewUser);
+      }
+      setAuthLoading(false); // انتهى التحقق
     });
 
-    // الاستماع للتغييرات (تسجيل دخول/خروج)
+    // الاستماع للتغييرات
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) checkSubscription(session.user.id);
+      
+      // ✅ التحصين هنا أيضاً
+      if (session && session.user) {
+        checkSubscription(session.user.id);
+        checkIsNewUser(session.user.id).then(setIsNewUser);
+      }
       setAuthLoading(false);
     });
 
@@ -290,7 +299,6 @@ if (view === 'refund') {
     );
   }
 
-  // 2. DASHBOARD
   // 2. DASHBOARD
   if (!mode) {
     // ✅ ملاحظة: نحن نستخدم '?' (Optional Chaining) لضمان عدم انهيار التطبيق إذا كان الاسم مفقوداً
