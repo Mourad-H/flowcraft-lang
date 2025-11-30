@@ -6,7 +6,7 @@ import { RefundPolicy } from './RefundPolicy';
 
 export default function FlowCraftLang() {
   // ==========================================
-  // 1. ALL STATES (HOOKS)
+  // 1. ALL STATES
   // ==========================================
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -18,6 +18,7 @@ export default function FlowCraftLang() {
   const [currentLesson, setCurrentLesson] = useState(1);
   const [isNewUser, setIsNewUser] = useState(false);
   const [view, setView] = useState('home');
+  const [msgCount, setMsgCount] = useState(0); // ✅ عداد الرسائل اليومي
   
   // Auth Form States
   const [email, setEmail] = useState('');
@@ -28,89 +29,80 @@ export default function FlowCraftLang() {
   const scrollRef = useRef(null);
 
   // ==========================================
-  // 2. EFFECTS (Must come before any return)
+  // 2. HELPER FUNCTIONS
   // ==========================================
 
-  useEffect(() => {
-    // منطق التحقق من الجلسة عند البدء
-    const handleAuthCheck = async (currentSession) => {
-      try {
-        if (currentSession?.user) {
-          // التحقق من الاشتراك
-          const { data: userData, error } = await supabase
-            .from('users')
-            .select('subscription_status')
-            .eq('id', currentSession.user.id)
-            .single();
-
-          if (userData) {
-            setUserTier(userData.subscription_status || 'free');
-          } else if (!error || error.code === 'PGRST116') {
-            // إنشاء صف للمستخدم الجديد إذا لم يوجد
-            await supabase.from('users').insert([{ id: currentSession.user.id, subscription_status: 'free' }]).select();
-            setUserTier('free');
-          }
-
-          // التحقق هل هو مستخدم جديد (للترحيب)
-          const { count } = await supabase
+  // تحديث: دالة ذكية تجلب عدد رسائل اليوم فقط
+  const fetchUsageStats = async (userId) => {
+    const today = new Date().toISOString().split('T')[0]; // تاريخ اليوم YYYY-MM-DD
+    
+    try {
+        // 1. هل هو جديد كلياً؟
+        const { count: totalCount } = await supabase
             .from('conversations')
             .select('id', { count: 'exact', head: true })
-            .eq('user_id', currentSession.user.id);
-          
-          setIsNewUser(count === 0);
-        }
-      } catch (err) {
-        console.error("Auth Check Error:", err);
-      } finally {
-        setAuthLoading(false);
-      }
-    };
+            .eq('user_id', userId);
+        
+        setIsNewUser(totalCount === 0);
 
-    // الاستماع للجلسة
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) handleAuthCheck(session);
-      else setAuthLoading(false);
-    });
+        // 2. كم رسالة أرسل اليوم؟ (لمطابقة منطق الباك-إند)
+        const { count: todayCount } = await supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gte('created_at', today)
+            .eq('role', 'user');
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) handleAuthCheck(session);
-      else setAuthLoading(false);
-    });
+        setMsgCount(todayCount || 0);
 
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // سكرول تلقائي للرسائل
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // ==========================================
-  // 3. HELPER FUNCTIONS
-  // ==========================================
-
-  const handleAuthSubmit = async (isSignUp) => {
-    if (!email || !password) return;
-    setLoading(true);
-    setAuthMessage('');
-
-    let result;
-    if (isSignUp) {
-      result = await supabase.auth.signUp({ email, password });
-    } else {
-      result = await supabase.auth.signInWithPassword({ email, password });
+    } catch (err) {
+        console.error("Stats fetch error:", err);
     }
-
-    if (result.error) {
-      setAuthMessage(result.error.message);
-    } else if (isSignUp) {
-      setAuthMessage("Signup successful! Please check your email for confirmation.");
-    }
-    setLoading(false);
   };
 
+  const checkSubscription = async (userId) => {
+    if (!userId) { setUserTier('free'); return; }
+    
+    const { data: userData, error } = await supabase
+        .from('users')
+        .select('subscription_status')
+        .eq('id', userId)
+        .single();
+    
+    if (error && error.code !== 'PGRST116') { setUserTier('free'); return; }
+
+    if (userData) {
+        setUserTier(userData.subscription_status || 'free');
+    } else {
+        try {
+            await supabase.from('users').insert([{ id: userId, subscription_status: 'free' }]).select(); 
+            setUserTier('free');
+        } catch (insertError) {
+            setUserTier('free');
+        }
+    }
+  };
+
+  const handleAuthSubmit = async (isSignUp) => {
+      if (!email || !password) return;
+      setLoading(true);
+      setAuthMessage('');
+
+      let result;
+      if (isSignUp) {
+        result = await supabase.auth.signUp({ email, password });
+      } else {
+        result = await supabase.auth.signInWithPassword({ email, password });
+      }
+
+      if (result.error) {
+          setAuthMessage(result.error.message);
+      } else if (isSignUp) {
+        setAuthMessage("Signup successful! Please check your email for confirmation.");
+      }
+      setLoading(false);
+  };
+  
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setMode(null);
@@ -129,8 +121,7 @@ export default function FlowCraftLang() {
     
     const utterance = new SpeechSynthesisUtterance(cleanText);
     if (japanVoice) { utterance.voice = japanVoice; utterance.lang = 'ja-JP'; } else { utterance.lang = 'ja-JP'; }
-    utterance.rate = 1.0; 
-    utterance.pitch = 1.1;
+    utterance.rate = 1.0; utterance.pitch = 1.1;
     window.speechSynthesis.speak(utterance);
   };
 
@@ -156,6 +147,9 @@ export default function FlowCraftLang() {
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || "Server Error");
 
+      // تحديث العداد محلياً فوراً لكي لا يضطر المستخدم لعمل ريفريش
+      setMsgCount(prev => prev + 1);
+
       const aiMsgContent = data.message || "Error: No response";
       
       if (aiMsgContent.includes("LESSON_COMPLETE")) {
@@ -170,6 +164,8 @@ export default function FlowCraftLang() {
       let errorMessage = err.message || "Unknown Error";
       if (errorMessage.includes("LIMIT_EXCEEDED")) {
           alert("LIMIT EXCEEDED: Your 3 free messages are done for today! Upgrade to Premium to continue your training. ⚔️");
+          // تحديث العداد للتأكيد
+          setMsgCount(3); 
       } else if (errorMessage.includes("Server Error") || errorMessage.includes("Groq API Error")) {
           alert("SYSTEM ERROR: AI service unavailable. Try again later.");
       } else {
@@ -200,7 +196,47 @@ export default function FlowCraftLang() {
   };
 
   // ==========================================
-  // 4. RENDERING (الشاشات)
+  // 3. EFFECTS
+  // ==========================================
+
+  useEffect(() => {
+    const handleAuthCheck = async (currentSession) => {
+      try {
+        if (currentSession?.user) {
+          // جلب كل البيانات دفعة واحدة (الاشتراك + العداد)
+          await Promise.all([
+             checkSubscription(currentSession.user.id),
+             fetchUsageStats(currentSession.user.id) // ✅ الدالة الجديدة
+          ]);
+        }
+      } catch (err) {
+        console.error("Auth Check Error:", err);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) handleAuthCheck(session);
+      else setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) handleAuthCheck(session);
+      else setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // ==========================================
+  // 4. RENDERING
   // ==========================================
 
   // A. Loading Screen
@@ -213,11 +249,11 @@ export default function FlowCraftLang() {
     );
   }
 
-  // B. Legal Pages Routing
+  // B. Legal Pages
   if (view === 'privacy') return <PrivacyPolicy setView={setView} />;
   if (view === 'refund') return <RefundPolicy setView={setView} />;
 
-  // C. Auth Screen (Landing Page)
+  // C. Auth Screen
   if (!session) {
     return (
       <div className="min-h-screen bg-anime-bg text-white font-sans selection:bg-anime-accent selection:text-white">
@@ -282,10 +318,10 @@ export default function FlowCraftLang() {
     );
   }
 
-  // D. Dashboard (Mode Selection)
+  // D. Dashboard (هنا التغيير الذكي للافتة)
   if (!mode) {
-    // محاولة استخراج الاسم من الميتاداتا أو الإيميل
     const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Shinobi";
+    const messagesLeft = Math.max(0, 3 - msgCount); // حساب المتبقي
 
     return (
       <div className="min-h-screen bg-anime-bg text-white p-6 flex flex-col items-center justify-center">
@@ -294,40 +330,62 @@ export default function FlowCraftLang() {
             <span className="text-anime-primary">{userName}</span>-san!
         </h1>
         
-        {/* PAYWALL BANNER */}
+        {/* ✅ اللافتة الديناميكية */}
         {userTier === 'free' && (
-            <div className="mb-8 p-6 bg-gradient-to-r from-anime-warning/20 to-orange-600/20 border-2 border-anime-warning/50 rounded-xl max-w-4xl w-full flex justify-between items-center shadow-lg">
+            <div className={`mb-8 p-6 rounded-xl max-w-4xl w-full flex justify-between items-center shadow-lg border-2 ${
+                msgCount >= 3 
+                ? "bg-gradient-to-r from-red-900/50 to-red-600/20 border-red-500" // أحمر: انتهى الرصيد
+                : "bg-gradient-to-r from-green-900/50 to-emerald-600/20 border-green-500" // أخضر: مسموح
+            }`}>
                 <div>
-                    <p className="text-lg font-bold text-anime-warning">Access Restricted</p>
-                    <p className="text-sm text-gray-300">You have a 3-message limit. Upgrade now to unlock unlimited training! ⚔️</p>
+                    <p className={`text-lg font-bold ${msgCount >= 3 ? "text-red-400" : "text-green-400"}`}>
+                        {msgCount >= 3 ? "Daily Limit Reached ⛔" : "Free Training Active ✅"}
+                    </p>
+                    <p className="text-sm text-gray-300">
+                        {msgCount >= 3 
+                            ? "You used all 3 free messages. Upgrade for unlimited power!" 
+                            : `You have ${messagesLeft} free messages left for today.`}
+                    </p>
                 </div>
-                <button onClick={() => handleCryptoUpgrade('premium')} className="bg-anime-warning text-black font-bold px-6 py-2 rounded-lg hover:bg-yellow-300 transition shrink-0">
-                    Start Premium Training
+                <button 
+                    onClick={() => handleCryptoUpgrade('premium')} 
+                    className="bg-anime-warning text-black font-bold px-6 py-2 rounded-lg hover:bg-yellow-300 transition shrink-0"
+                >
+                    {msgCount >= 3 ? "Unlock Unlimited 🔓" : "Go Premium ⭐"}
                 </button>
             </div>
         )}
 
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
+          {/* الأزرار: نغلقها فقط إذا وصل الحد 3 */}
           <button 
             onClick={() => setMode('chat')} 
-            disabled={userTier === 'free'} 
-            className={`group relative p-8 rounded-2xl transition text-left overflow-hidden ${userTier === 'free' ? 'bg-anime-card/50 border-white/10 opacity-70 cursor-not-allowed' : 'bg-anime-card border border-anime-primary/30 hover:border-anime-accent'}`}
+            disabled={userTier === 'free' && msgCount >= 3} 
+            className={`group relative p-8 rounded-2xl transition text-left overflow-hidden ${
+                userTier === 'free' && msgCount >= 3 
+                ? 'bg-anime-card/50 border-white/10 opacity-50 cursor-not-allowed' 
+                : 'bg-anime-card border border-anime-primary/30 hover:border-anime-accent'
+            }`}
           >
              <MessageCircle size={40} className="text-anime-primary mb-4" />
              <h2 className="text-2xl font-bold mb-2">Free Chat Mode</h2>
              <p className="text-gray-400">Talk to FlowSensei about any anime.</p>
-             {userTier === 'free' && <Lock className="absolute top-2 right-2 text-red-400" size={24} />} 
+             {userTier === 'free' && msgCount >= 3 && <Lock className="absolute top-2 right-2 text-red-400" size={24} />} 
           </button>
 
           <button 
             onClick={() => setMode('lessons')} 
-            disabled={userTier === 'free'}
-            className={`group relative p-8 rounded-2xl transition text-left overflow-hidden ${userTier === 'free' ? 'bg-anime-card/50 border-white/10 opacity-70 cursor-not-allowed' : 'bg-anime-card border border-anime-accent/30 hover:border-anime-accent'}`}
+            disabled={userTier === 'free' && msgCount >= 3}
+            className={`group relative p-8 rounded-2xl transition text-left overflow-hidden ${
+                userTier === 'free' && msgCount >= 3 
+                ? 'bg-anime-card/50 border-white/10 opacity-50 cursor-not-allowed' 
+                : 'bg-anime-card border border-anime-accent/30 hover:border-anime-accent'
+            }`}
           >
              <BookOpen size={40} className="text-anime-accent mb-4" />
              <h2 className="text-2xl font-bold mb-2">Structured Path</h2>
              <p className="text-gray-400">Follow the "Way of the Ninja" curriculum.</p>
-             {userTier === 'free' && <Lock className="absolute top-2 right-2 text-red-400" size={24} />} 
+             {userTier === 'free' && msgCount >= 3 && <Lock className="absolute top-2 right-2 text-red-400" size={24} />} 
           </button>
         </div>
         
@@ -341,33 +399,22 @@ export default function FlowCraftLang() {
   // E. Chat Interface
   return (
     <div className="flex h-screen bg-anime-bg text-white font-sans overflow-hidden">
-      {/* Mobile Header */}
+      {/* ... (نفس كود الشات السابق، لا تغيير) ... */}
       <div className="md:hidden fixed top-0 w-full bg-anime-bg/90 backdrop-blur border-b border-white/5 p-4 flex justify-between items-center z-50">
         <div className="font-bold text-anime-primary">FlowCraft</div>
         <button onClick={() => setMode(null)} className="text-xs bg-white/10 px-3 py-1 rounded">Menu</button>
       </div>
-
-      {/* Sidebar (Desktop) */}
       <div className="w-72 bg-anime-card border-r border-white/5 hidden md:flex flex-col p-4">
-        <div className="font-black text-xl tracking-tighter mb-8 text-transparent bg-clip-text bg-gradient-to-r from-anime-primary to-anime-accent cursor-pointer" onClick={() => setMode(null)}>
-          FlowCraftLang
-        </div>
+        <div className="font-black text-xl tracking-tighter mb-8 text-transparent bg-clip-text bg-gradient-to-r from-anime-primary to-anime-accent cursor-pointer" onClick={() => setMode(null)}>FlowCraftLang</div>
         <div className="mt-auto pt-4 border-t border-white/5">
-           <button onClick={() => setMode(null)} className="text-sm text-gray-400 hover:text-white flex items-center gap-2">
-             <ChevronRight className="rotate-180" size={16}/> Back to Menu
-           </button>
+           <button onClick={() => setMode(null)} className="text-sm text-gray-400 hover:text-white flex items-center gap-2"><ChevronRight className="rotate-180" size={16}/> Back to Menu</button>
         </div>
       </div>
-
-      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col relative pt-16 md:pt-0">
         <div className="h-16 border-b border-white/5 hidden md:flex items-center px-6 justify-between bg-anime-bg/50 backdrop-blur z-10">
-          <h2 className="font-bold text-lg">
-            {mode === 'chat' ? 'Free Chat Mode 💬' : `Training Level ${currentLesson} ⚔️`}
-          </h2>
+          <h2 className="font-bold text-lg">{mode === 'chat' ? 'Free Chat Mode 💬' : `Training Level ${currentLesson} ⚔️`}</h2>
           {userTier === 'free' && <button onClick={() => handleCryptoUpgrade('premium')} className="text-xs bg-anime-warning text-black px-3 py-1 rounded font-bold">UPGRADE</button>}
         </div>
-
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
           {messages.length === 0 && (
             <div className="text-center text-gray-500 mt-20">
@@ -375,22 +422,12 @@ export default function FlowCraftLang() {
               <p>Say "Osu!" or "Konnichiwa" to start!</p>
             </div>
           )}
-          
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] md:max-w-2xl p-4 rounded-2xl ${
-                msg.role === 'user' 
-                  ? 'bg-anime-primary text-black font-medium rounded-tr-none' 
-                  : 'bg-anime-card border border-white/10 rounded-tl-none'
-              }`}>
+              <div className={`max-w-[85%] md:max-w-2xl p-4 rounded-2xl ${msg.role === 'user' ? 'bg-anime-primary text-black font-medium rounded-tr-none' : 'bg-anime-card border border-white/10 rounded-tl-none'}`}>
                 <div className="whitespace-pre-wrap">{msg.content}</div>
                 {msg.role === 'assistant' && (
-                   <button 
-                     onClick={() => speak(msg.content)}
-                     className="mt-2 text-xs opacity-70 hover:opacity-100 flex items-center gap-1 bg-black/20 px-2 py-1 rounded"
-                   >
-                     <Volume2 size={12}/> Pronounce
-                   </button>
+                   <button onClick={() => speak(msg.content)} className="mt-2 text-xs opacity-70 hover:opacity-100 flex items-center gap-1 bg-black/20 px-2 py-1 rounded"><Volume2 size={12}/> Pronounce</button>
                 )}
               </div>
             </div>
@@ -398,23 +435,10 @@ export default function FlowCraftLang() {
           {loading && <div className="text-anime-accent animate-pulse pl-4">Sensei is writing... ✍️</div>}
           <div ref={scrollRef}/>
         </div>
-
         <div className="p-4 border-t border-white/5 bg-anime-bg">
           <div className="max-w-4xl mx-auto relative">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Type your message..."
-              className="w-full bg-anime-card border border-white/10 rounded-full py-3 px-5 pr-12 focus:outline-none focus:border-anime-primary text-white placeholder-gray-500"
-            />
-            <button 
-              onClick={handleSend}
-              disabled={loading}
-              className="absolute right-2 top-1.5 p-2 bg-anime-primary rounded-full text-black hover:bg-cyan-300 transition disabled:opacity-50"
-            >
-              <Send size={18} />
-            </button>
+            <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Type your message..." className="w-full bg-anime-card border border-white/10 rounded-full py-3 px-5 pr-12 focus:outline-none focus:border-anime-primary text-white placeholder-gray-500" />
+            <button onClick={handleSend} disabled={loading} className="absolute right-2 top-1.5 p-2 bg-anime-primary rounded-full text-black hover:bg-cyan-300 transition disabled:opacity-50"><Send size={18} /></button>
           </div>
         </div>
       </div>
