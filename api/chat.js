@@ -2,7 +2,6 @@ import { createClient } from '@supabase/supabase-js'
 
 // التحقق من وجود المفاتيح
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !process.env.GROQ_API_KEY) {
-  // هذا سيجبر Vercel على إظهار الخطأ إذا لم تكن المفاتيح موجودة
   throw new Error("MISSING ENV VARIABLES IN VERCEL");
 }
 
@@ -12,7 +11,7 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  // إعدادات CORS (لا تغيير)
+  // إعدادات CORS
   res.setHeader('Access-Control-Allow-Credentials', true)
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
@@ -23,44 +22,35 @@ export default async function handler(req, res) {
 
   try {
     const { messages, mode, userId, lessonId } = req.body
-    // 🛑 1. تأكيد وجود هوية المستخدم (CRITICAL FIX)
+
+    // 🛑 1. تأكيد وجود هوية المستخدم
     if (!userId) {
-        // إذا كان المستخدم مجهولاً، نتوقف ونطلب الدخول
         return res.status(401).json({ error: "USER_ID_MISSING" });
     }
 
-    // 🛑 1. منطق الحد المجاني (The Paywall) 🛑
-    if (userId) {
-        // 🛑 ابحث عن منطق التحقق من الاشتراك القديم واستبدله بالكامل بهذا الكود 🛑
-
-    // 1. جلب بيانات المستخدم للتحقق من انتهاء الصلاحية
+    // 🛑 2. منطق الحد المجاني والاشتراك
+    // 1. جلب بيانات المستخدم
     const { data: user, error: userError } = await supabase
         .from('users')
-        .select('subscription_status, subscription_ends_at') // جلب عمود انتهاء الصلاحية
+        .select('subscription_status, subscription_ends_at')
         .eq('id', userId)
         .single();
     
-    if (userError) {
-        console.error("User fetch error:", userError);
-        // نواصل بوضع مجاني إذا فشل جلب بيانات المستخدم
-    }
+    if (userError) console.error("User fetch error:", userError);
 
-    // 2. التحقق من انتهاء الصلاحية (Expiration Check)
+    // 2. التحقق من انتهاء الصلاحية
     if (user && user.subscription_ends_at && new Date(user.subscription_ends_at) < new Date()) {
-        // إذا انتهت صلاحية الاشتراك، نغير الحالة ونرد بخطأ
         await supabase.from('users').update({ subscription_status: 'expired' }).eq('id', userId);
         return res.status(403).json({ error: "SUBSCRIPTION_EXPIRED" }); 
     }
     
-    // تحديد حالة الاشتراك بناءً على البيانات: إذا لم يكن هناك مستخدم، فالحالة 'free'
     const subscriptionStatus = user?.subscription_status || 'free'; 
 
-    // 🛑 3. منطق الحد المجاني (3 رسائل فقط للمستخدمين غير المشتركين)
+    // 3. التحقق من الحد اليومي (للـ Free فقط)
     if (subscriptionStatus !== 'active') {
-        const DAILY_LIMIT = 3; // ✅ الحد المجاني الجديد: 3 رسائل فقط
-        const today = new Date().toISOString().split('T')[0]; // تاريخ اليوم فقط
+        const DAILY_LIMIT = 3; 
+        const today = new Date().toISOString().split('T')[0]; 
 
-        // نعد رسائل المستخدم لهذا اليوم (فقط الرسائل التي أرسلها المستخدم 'role: user')
         const { count, error: countError } = await supabase
             .from('conversations')
             .select('*', { count: 'exact', head: true })
@@ -71,58 +61,39 @@ export default async function handler(req, res) {
         if (countError) console.error("Limit Check Error:", countError);
         
         if (count >= DAILY_LIMIT) {
-            // خطأ مخصص يخبر الواجهة الأمامية بضرورة الترقية
-            return res.status(403).json({ error: "UPGRADE_REQUIRED" });
+            return res.status(403).json({ error: "LIMIT_EXCEEDED" });
         }
     }
-    
-// 🛑 هنا ينتهي منطق التحقق، ويستمر باقي الكود في الملف (كود استدعاء OpenAI) 🛑
+
+    // ✅ 4. حفظ رسالة المستخدم في قاعدة البيانات (هذا ما كان ينقصنا!) ✅
+    // بدون هذه الخطوة، العداد لن يزيد أبداً
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.role === 'user') {
+        await supabase.from('conversations').insert({
+            user_id: userId,
+            role: 'user',
+            content: lastMessage.content,
+            mode: mode
+        });
     }
-    // نهاية منطق الحد المجاني -- إذا وصل الكود إلى هنا، فالمستخدم إما مدفوع أو ضمن الحد
 
-    // 2. هندسة الأوامر المحسنة للصوت (TTS OPTIMIZED PROMPTS) 🎤
+    // 5. هندسة الأوامر (Prompts)
     let systemPrompt = "";
-    // ... بقية الـ Prompts كما هي
-
     const commonRules = `
     IMPORTANT FOR TTS (TEXT TO SPEECH):
     1. Use Japanese punctuation (、 and 。) frequently. This creates natural pauses in the voice.
     2. Example: "Sugoi! (すごい！)" is better than "Sugoi".
     3. Keep sentences short and punchy like an Anime character.
-    4. Don't use complex markdown or lists if possible, talk like a human.
     `;
 
     if (mode === 'chat') {
-      systemPrompt = `You are "FlowSensei", a cool, energetic Japanese tutor obsessed with Anime.
-      
-      ${commonRules}
-      
-      BEHAVIOR:
-      - Reply mainly in English but teach Japanese phrases.
-      - Every example MUST come from popular anime (Naruto, One Piece, JJK, Demon Slayer).
-      - If teaching grammar, use anime quotes.
-      - Use emojis like 🎌, ⚔️, 🍥 to separate sections.
-      `;
+      systemPrompt = `You are "FlowSensei", a cool, energetic Japanese tutor obsessed with Anime. ${commonRules} Reply mainly in English but teach Japanese phrases. Every example MUST come from popular anime.`;
     } 
     else if (mode === 'lessons') {
-      systemPrompt = `You are guiding the user through Lesson ${lessonId}.
-      
-      ${commonRules}
-      
-      LESSON CONTEXT:
-      - Lesson 1: Greetings (Ohayou, Konnichiwa).
-      - Lesson 2: Introductions (Watashi wa...).
-      - Lesson 3: Battle Phases.
-      
-      INSTRUCTIONS:
-      - Explain the topic using Anime examples.
-      - Give 3 key phrases.
-      - Ask the user to repeat one.
-      - If they get it right, say EXACTLY: "LESSON_COMPLETE" at the end of your sentence.
-      `;
+      systemPrompt = `You are guiding the user through Lesson ${lessonId}. ${commonRules} Explain the topic using Anime examples. Give 3 key phrases. Say EXACTLY: "LESSON_COMPLETE" if they get it right.`;
     }
 
-    // 3. الاتصال بـ Groq (Llama 3.3)
+    // 6. الاتصال بـ Groq
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -130,7 +101,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile', // الموديل الجديد
+        model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
           ...messages
@@ -140,15 +111,24 @@ export default async function handler(req, res) {
       })
     })
     
-    // ... logging conversation (Optional - we skip logging here to simplify code)
-    
     const data = await response.json()
 
     if (data.error) {
         throw new Error(`Groq API Error: ${data.error.message}`);
     }
 
-    return res.status(200).json({ message: data.choices[0].message.content })
+    const aiResponseContent = data.choices[0].message.content;
+
+    // ✅ 7. حفظ رد الـ AI في قاعدة البيانات (للسجل) ✅
+    await supabase.from('conversations').insert({
+        user_id: userId,
+        role: 'assistant',
+        content: aiResponseContent,
+        mode: mode,
+        tokens_used: data.usage?.total_tokens || 0
+    });
+
+    return res.status(200).json({ message: aiResponseContent })
 
   } catch (error) {
     console.error("🔥 FATAL API ERROR:", error);
