@@ -16,14 +16,16 @@ export default async function handler(req, res) {
   if (!userId || !tier) return res.status(400).json({ error: 'Missing User ID or Tier' });
 
   const price = tier === 'premium' ? 17 : 10;
-  const orderId = uuidv4();
   
-  // تحسين بناء الروابط لضمان البروتوكول الصحيح (https)
+  // ✅ الحيلة هنا: ندمج معرف المستخدم مع رقم عشوائي لنمرره عبر NowPayments
+  // الشكل سيكون: "user_12345__uuid-random-string"
+  const orderId = `${userId}__${uuidv4()}`; 
+  
   const protocol = req.headers['x-forwarded-proto'] || 'https';
   const host = req.headers.host;
   
   const callbackUrl = `${protocol}://${host}/api/webhooks/nowpayments`;
-  const returnUrl = `${protocol}://${host}`; // العودة للصفحة الرئيسية
+  const returnUrl = `${protocol}://${host}`;
 
   try {
     const response = await fetch('https://api.nowpayments.io/v1/invoice', {
@@ -35,18 +37,13 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         price_amount: price,
         price_currency: 'usd',
-        // 🛑 حذفنا pay_currency: 'usdc' للسماح للمستخدم باختيار العملة
-        order_id: orderId,
-        order_description: `FlowCraft ${tier} subscription`, // وصف يظهر في الفاتورة
+        // حذفنا pay_currency ليختار المستخدم العملة
+        order_id: orderId, // ✅ هذا الحقل يحتوي الآن على معرف المستخدم
+        order_description: `FlowCraft ${tier} subscription`,
         ipn_callback_url: callbackUrl,
         success_url: returnUrl,
         cancel_url: returnUrl,
-        
-        // ✅ هذا هو الجزء الأهم الذي كان ناقصاً في الكود القديم:
-        // نمرر الـ ID هنا ليعود إلينا في الـ Webhook ونعرف من قام بالدفع
-        extra: {
-            userId: userId 
-        }
+        // ❌ حذفنا حقل extra المرفوض تماماً
       })
     });
 
