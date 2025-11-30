@@ -1,13 +1,13 @@
- import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { Zap, MessageCircle, BookOpen, Lock, Star, ChevronRight, Send, Volume2, LogOut } from 'lucide-react';
 import { PrivacyPolicy } from './PrivacyPolicy';
 import { RefundPolicy } from './RefundPolicy';
 
 export default function FlowCraftLang() {
-  // ----------------------------------------------------
-  // 1. STATE DEFINITIONS
-  // ----------------------------------------------------
+  // ==========================================
+  // 1. ALL STATES (HOOKS)
+  // ==========================================
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [userTier, setUserTier] = useState('free');
@@ -19,7 +19,7 @@ export default function FlowCraftLang() {
   const [isNewUser, setIsNewUser] = useState(false);
   const [view, setView] = useState('home');
   
-  // Auth States
+  // Auth Form States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
@@ -27,49 +27,90 @@ export default function FlowCraftLang() {
   
   const scrollRef = useRef(null);
 
-  // ----------------------------------------------------
-  // 2. HELPER FUNCTIONS
-  // ----------------------------------------------------
-const checkSubscription = async (userId) => {
-    // هذه النسخة بسيطة لأن قاعدة البيانات (Trigger) قامت بإنشاء الصف بالفعل
-    if (!userId) { setUserTier('free'); return; }
-    
-    const { data: userData, error } = await supabase
-        .from('users')
-        .select('subscription_status')
-        .eq('id', userId)
-        .single();
-    
-    if (error) { 
-        // في حالة حدوث أي خطأ، نعتبره مجانياً ولا نوقف التطبيق
-        console.error("Subscription check error:", error);
-        setUserTier('free'); 
-    } else if (userData) {
-        setUserTier(userData.subscription_status || 'free');
-    }
-  };
+  // ==========================================
+  // 2. EFFECTS (Must come before any return)
+  // ==========================================
+
+  useEffect(() => {
+    // منطق التحقق من الجلسة عند البدء
+    const handleAuthCheck = async (currentSession) => {
+      try {
+        if (currentSession?.user) {
+          // التحقق من الاشتراك
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('subscription_status')
+            .eq('id', currentSession.user.id)
+            .single();
+
+          if (userData) {
+            setUserTier(userData.subscription_status || 'free');
+          } else if (!error || error.code === 'PGRST116') {
+            // إنشاء صف للمستخدم الجديد إذا لم يوجد
+            await supabase.from('users').insert([{ id: currentSession.user.id, subscription_status: 'free' }]).select();
+            setUserTier('free');
+          }
+
+          // التحقق هل هو مستخدم جديد (للترحيب)
+          const { count } = await supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', currentSession.user.id);
+          
+          setIsNewUser(count === 0);
+        }
+      } catch (err) {
+        console.error("Auth Check Error:", err);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    // الاستماع للجلسة
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) handleAuthCheck(session);
+      else setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) handleAuthCheck(session);
+      else setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // سكرول تلقائي للرسائل
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // ==========================================
+  // 3. HELPER FUNCTIONS
+  // ==========================================
 
   const handleAuthSubmit = async (isSignUp) => {
-      if (!email || !password) return;
-      setLoading(true);
-      setAuthMessage('');
+    if (!email || !password) return;
+    setLoading(true);
+    setAuthMessage('');
 
-      let result;
-      if (isSignUp) {
-        result = await supabase.auth.signUp({ email, password });
-      } else {
-        result = await supabase.auth.signInWithPassword({ email, password });
-      }
+    let result;
+    if (isSignUp) {
+      result = await supabase.auth.signUp({ email, password });
+    } else {
+      result = await supabase.auth.signInWithPassword({ email, password });
+    }
 
-      if (result.error) {
-          setAuthMessage(result.error.message);
-          setSession(null);
-      } else if (isSignUp) {
-        setAuthMessage("Signup successful! Please check your email for confirmation.");
-      }
-      setLoading(false);
+    if (result.error) {
+      setAuthMessage(result.error.message);
+    } else if (isSignUp) {
+      setAuthMessage("Signup successful! Please check your email for confirmation.");
+    }
+    setLoading(false);
   };
-  
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setMode(null);
@@ -81,12 +122,15 @@ const checkSubscription = async (userId) => {
     if (!window.speechSynthesis) return;
     const cleanText = text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
     window.speechSynthesis.cancel();
+    
     const voices = window.speechSynthesis.getVoices();
     const japanVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || 
                        voices.find(v => v.lang === 'ja-JP');
+    
     const utterance = new SpeechSynthesisUtterance(cleanText);
     if (japanVoice) { utterance.voice = japanVoice; utterance.lang = 'ja-JP'; } else { utterance.lang = 'ja-JP'; }
-    utterance.rate = 1.0; utterance.pitch = 1.1;
+    utterance.rate = 1.0; 
+    utterance.pitch = 1.1;
     window.speechSynthesis.speak(utterance);
   };
 
@@ -110,7 +154,8 @@ const checkSubscription = async (userId) => {
       });
 
       const data = await res.json();
-      if (!res.ok || data.error) { throw new Error(data.error || "Server Error"); }
+      if (!res.ok || data.error) throw new Error(data.error || "Server Error");
+
       const aiMsgContent = data.message || "Error: No response";
       
       if (aiMsgContent.includes("LESSON_COMPLETE")) {
@@ -126,7 +171,7 @@ const checkSubscription = async (userId) => {
       if (errorMessage.includes("LIMIT_EXCEEDED")) {
           alert("LIMIT EXCEEDED: Your 3 free messages are done for today! Upgrade to Premium to continue your training. ⚔️");
       } else if (errorMessage.includes("Server Error") || errorMessage.includes("Groq API Error")) {
-          alert("SYSTEM ERROR: The AI service is currently down or requires maintenance.");
+          alert("SYSTEM ERROR: AI service unavailable. Try again later.");
       } else {
           alert("Error: " + errorMessage); 
       }
@@ -145,7 +190,7 @@ const checkSubscription = async (userId) => {
         body: JSON.stringify({ userId: session.user.id, tier: tier })
       });
       const data = await response.json();
-      if (!response.ok || data.error) { throw new Error(data.error || 'Invoice creation failed.'); }
+      if (!response.ok || data.error) throw new Error(data.error || 'Invoice creation failed.');
       window.location.href = data.invoice_url;
     } catch (error) {
       alert("Error creating invoice: " + error.message);
@@ -155,54 +200,10 @@ const checkSubscription = async (userId) => {
   };
 
   // ==========================================
-  // 3. EFFECTS (التحصين ضد التعليق)
+  // 4. RENDERING (الشاشات)
   // ==========================================
 
-  useEffect(() => {
-    // هذه الدالة الآن محمية بـ try/catch/finally لضمان توقف التحميل دائماً
-    const handleAuthCheck = async (initialSession) => {
-        try {
-            if (initialSession && initialSession.user) {
-                // تنفيذ العمليات بالتوازي لتسريع التحميل
-                await Promise.all([
-                    checkSubscription(initialSession.user.id),
-                    checkIsNewUser(initialSession.user.id).then(setIsNewUser)
-                ]);
-            }
-        } catch (error) {
-            console.error("Auth check failed:", error);
-        } finally {
-            // ✅ هذا السطر سيتم تنفيذه مهما حدث، مما يمنع التعليق
-            setAuthLoading(false);
-        }
-    }
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      handleAuthCheck(session);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        setSession(session);
-        // فقط إذا كانت هناك جلسة، نعيد التحقق. إذا لم تكن، نوقف التحميل فوراً.
-        if (session) {
-            handleAuthCheck(session);
-        } else {
-            setAuthLoading(false);
-        }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // ==========================================
-  // 4. RENDERING
-  // ==========================================
-
+  // A. Loading Screen
   if (authLoading) {
     return (
       <div className="min-h-screen bg-anime-bg flex flex-col items-center justify-center text-white">
@@ -212,9 +213,11 @@ const checkSubscription = async (userId) => {
     );
   }
 
+  // B. Legal Pages Routing
   if (view === 'privacy') return <PrivacyPolicy setView={setView} />;
   if (view === 'refund') return <RefundPolicy setView={setView} />;
 
+  // C. Auth Screen (Landing Page)
   if (!session) {
     return (
       <div className="min-h-screen bg-anime-bg text-white font-sans selection:bg-anime-accent selection:text-white">
@@ -225,7 +228,10 @@ const checkSubscription = async (userId) => {
               FlowCraftLang
             </span>
           </div>
-          <button onClick={() => setIsLoginView(!isLoginView)} className="bg-white text-anime-bg px-6 py-2 rounded-full font-bold hover:scale-105 transition">
+          <button 
+             onClick={() => setIsLoginView(!isLoginView)} 
+             className="bg-white text-anime-bg px-6 py-2 rounded-full font-bold hover:scale-105 transition"
+          >
             {isLoginView ? 'Sign Up' : 'Log In'}
           </button>
         </nav>
@@ -237,17 +243,36 @@ const checkSubscription = async (userId) => {
               The Shonen Way
             </span>
           </h1>
+          
           <div className="max-w-md w-full mt-10 p-6 bg-anime-card rounded-xl border border-white/10 shadow-xl">
             <h2 className="text-2xl font-bold mb-4">{isLoginView ? 'Log In' : 'Create Account'}</h2>
+            
             <div className="flex flex-col gap-4">
-              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 rounded-lg text-black focus:ring-anime-primary outline-none" />
-              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 rounded-lg text-black focus:ring-anime-primary outline-none" />
-              <button onClick={() => handleAuthSubmit(!isLoginView)} disabled={loading || !email || !password} className="bg-anime-primary text-black font-bold py-3 rounded-lg hover:bg-cyan-400 transition">
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full p-3 rounded-lg text-black focus:ring-anime-primary outline-none"
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full p-3 rounded-lg text-black focus:ring-anime-primary outline-none"
+              />
+              <button 
+                onClick={() => handleAuthSubmit(!isLoginView)} 
+                disabled={loading || !email || !password}
+                className="bg-anime-primary text-black font-bold py-3 rounded-lg hover:bg-cyan-400 transition"
+              >
                 {loading ? 'Processing...' : (isLoginView ? 'Log In' : 'Sign Up')} 🚀
               </button>
               {authMessage && <p className="text-red-400 text-sm mt-2">{authMessage}</p>}
             </div>
           </div>
+
           <footer className="mt-20 text-gray-500 text-sm flex gap-4">
             <button onClick={() => setView('privacy')} className="hover:text-white">Privacy</button>
             <button onClick={() => setView('refund')} className="hover:text-white">Terms</button>
@@ -257,14 +282,19 @@ const checkSubscription = async (userId) => {
     );
   }
 
+  // D. Dashboard (Mode Selection)
   if (!mode) {
+    // محاولة استخراج الاسم من الميتاداتا أو الإيميل
     const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Shinobi";
+
     return (
       <div className="min-h-screen bg-anime-bg text-white p-6 flex flex-col items-center justify-center">
         <h1 className="text-3xl font-bold mb-8">
             {isNewUser ? "Welcome to the Dojo! 🥋" : "Welcome back, "}
             <span className="text-anime-primary">{userName}</span>-san!
         </h1>
+        
+        {/* PAYWALL BANNER */}
         {userTier === 'free' && (
             <div className="mb-8 p-6 bg-gradient-to-r from-anime-warning/20 to-orange-600/20 border-2 border-anime-warning/50 rounded-xl max-w-4xl w-full flex justify-between items-center shadow-lg">
                 <div>
@@ -276,20 +306,31 @@ const checkSubscription = async (userId) => {
                 </button>
             </div>
         )}
+
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
-          <button onClick={() => setMode('chat')} disabled={userTier === 'free'} className={`group relative p-8 rounded-2xl transition text-left overflow-hidden ${userTier === 'free' ? 'bg-anime-card/50 border-white/10 opacity-70 cursor-not-allowed' : 'bg-anime-card border border-anime-primary/30 hover:border-anime-accent'}`}>
+          <button 
+            onClick={() => setMode('chat')} 
+            disabled={userTier === 'free'} 
+            className={`group relative p-8 rounded-2xl transition text-left overflow-hidden ${userTier === 'free' ? 'bg-anime-card/50 border-white/10 opacity-70 cursor-not-allowed' : 'bg-anime-card border border-anime-primary/30 hover:border-anime-accent'}`}
+          >
              <MessageCircle size={40} className="text-anime-primary mb-4" />
              <h2 className="text-2xl font-bold mb-2">Free Chat Mode</h2>
              <p className="text-gray-400">Talk to FlowSensei about any anime.</p>
              {userTier === 'free' && <Lock className="absolute top-2 right-2 text-red-400" size={24} />} 
           </button>
-          <button onClick={() => setMode('lessons')} disabled={userTier === 'free'} className={`group relative p-8 rounded-2xl transition text-left overflow-hidden ${userTier === 'free' ? 'bg-anime-card/50 border-white/10 opacity-70 cursor-not-allowed' : 'bg-anime-card border border-anime-accent/30 hover:border-anime-accent'}`}>
+
+          <button 
+            onClick={() => setMode('lessons')} 
+            disabled={userTier === 'free'}
+            className={`group relative p-8 rounded-2xl transition text-left overflow-hidden ${userTier === 'free' ? 'bg-anime-card/50 border-white/10 opacity-70 cursor-not-allowed' : 'bg-anime-card border border-anime-accent/30 hover:border-anime-accent'}`}
+          >
              <BookOpen size={40} className="text-anime-accent mb-4" />
              <h2 className="text-2xl font-bold mb-2">Structured Path</h2>
              <p className="text-gray-400">Follow the "Way of the Ninja" curriculum.</p>
              {userTier === 'free' && <Lock className="absolute top-2 right-2 text-red-400" size={24} />} 
           </button>
         </div>
+        
         <button onClick={handleLogout} className="mt-8 text-gray-500 hover:text-white text-sm flex gap-2 items-center">
             <LogOut size={16}/> Log Out
         </button>
@@ -297,6 +338,7 @@ const checkSubscription = async (userId) => {
     );
   }
 
+  // E. Chat Interface
   return (
     <div className="flex h-screen bg-anime-bg text-white font-sans overflow-hidden">
       {/* Mobile Header */}
@@ -304,19 +346,28 @@ const checkSubscription = async (userId) => {
         <div className="font-bold text-anime-primary">FlowCraft</div>
         <button onClick={() => setMode(null)} className="text-xs bg-white/10 px-3 py-1 rounded">Menu</button>
       </div>
-      {/* Sidebar */}
+
+      {/* Sidebar (Desktop) */}
       <div className="w-72 bg-anime-card border-r border-white/5 hidden md:flex flex-col p-4">
-        <div className="font-black text-xl tracking-tighter mb-8 text-transparent bg-clip-text bg-gradient-to-r from-anime-primary to-anime-accent cursor-pointer" onClick={() => setMode(null)}>FlowCraftLang</div>
+        <div className="font-black text-xl tracking-tighter mb-8 text-transparent bg-clip-text bg-gradient-to-r from-anime-primary to-anime-accent cursor-pointer" onClick={() => setMode(null)}>
+          FlowCraftLang
+        </div>
         <div className="mt-auto pt-4 border-t border-white/5">
-           <button onClick={() => setMode(null)} className="text-sm text-gray-400 hover:text-white flex items-center gap-2"><ChevronRight className="rotate-180" size={16}/> Back to Menu</button>
+           <button onClick={() => setMode(null)} className="text-sm text-gray-400 hover:text-white flex items-center gap-2">
+             <ChevronRight className="rotate-180" size={16}/> Back to Menu
+           </button>
         </div>
       </div>
-      {/* Main Area */}
+
+      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col relative pt-16 md:pt-0">
         <div className="h-16 border-b border-white/5 hidden md:flex items-center px-6 justify-between bg-anime-bg/50 backdrop-blur z-10">
-          <h2 className="font-bold text-lg">{mode === 'chat' ? 'Free Chat Mode 💬' : `Training Level ${currentLesson} ⚔️`}</h2>
+          <h2 className="font-bold text-lg">
+            {mode === 'chat' ? 'Free Chat Mode 💬' : `Training Level ${currentLesson} ⚔️`}
+          </h2>
           {userTier === 'free' && <button onClick={() => handleCryptoUpgrade('premium')} className="text-xs bg-anime-warning text-black px-3 py-1 rounded font-bold">UPGRADE</button>}
         </div>
+
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
           {messages.length === 0 && (
             <div className="text-center text-gray-500 mt-20">
@@ -324,12 +375,22 @@ const checkSubscription = async (userId) => {
               <p>Say "Osu!" or "Konnichiwa" to start!</p>
             </div>
           )}
+          
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] md:max-w-2xl p-4 rounded-2xl ${msg.role === 'user' ? 'bg-anime-primary text-black font-medium rounded-tr-none' : 'bg-anime-card border border-white/10 rounded-tl-none'}`}>
+              <div className={`max-w-[85%] md:max-w-2xl p-4 rounded-2xl ${
+                msg.role === 'user' 
+                  ? 'bg-anime-primary text-black font-medium rounded-tr-none' 
+                  : 'bg-anime-card border border-white/10 rounded-tl-none'
+              }`}>
                 <div className="whitespace-pre-wrap">{msg.content}</div>
                 {msg.role === 'assistant' && (
-                   <button onClick={() => speak(msg.content)} className="mt-2 text-xs opacity-70 hover:opacity-100 flex items-center gap-1 bg-black/20 px-2 py-1 rounded"><Volume2 size={12}/> Pronounce</button>
+                   <button 
+                     onClick={() => speak(msg.content)}
+                     className="mt-2 text-xs opacity-70 hover:opacity-100 flex items-center gap-1 bg-black/20 px-2 py-1 rounded"
+                   >
+                     <Volume2 size={12}/> Pronounce
+                   </button>
                 )}
               </div>
             </div>
@@ -337,10 +398,23 @@ const checkSubscription = async (userId) => {
           {loading && <div className="text-anime-accent animate-pulse pl-4">Sensei is writing... ✍️</div>}
           <div ref={scrollRef}/>
         </div>
+
         <div className="p-4 border-t border-white/5 bg-anime-bg">
           <div className="max-w-4xl mx-auto relative">
-            <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder="Type your message..." className="w-full bg-anime-card border border-white/10 rounded-full py-3 px-5 pr-12 focus:outline-none focus:border-anime-primary text-white placeholder-gray-500" />
-            <button onClick={handleSend} disabled={loading} className="absolute right-2 top-1.5 p-2 bg-anime-primary rounded-full text-black hover:bg-cyan-300 transition disabled:opacity-50"><Send size={18} /></button>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="Type your message..."
+              className="w-full bg-anime-card border border-white/10 rounded-full py-3 px-5 pr-12 focus:outline-none focus:border-anime-primary text-white placeholder-gray-500"
+            />
+            <button 
+              onClick={handleSend}
+              disabled={loading}
+              className="absolute right-2 top-1.5 p-2 bg-anime-primary rounded-full text-black hover:bg-cyan-300 transition disabled:opacity-50"
+            >
+              <Send size={18} />
+            </button>
           </div>
         </div>
       </div>
