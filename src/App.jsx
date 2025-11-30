@@ -30,48 +30,22 @@ export default function FlowCraftLang() {
   // ----------------------------------------------------
   // 2. HELPER FUNCTIONS
   // ----------------------------------------------------
-
-  const checkIsNewUser = async (userId) => {
-    try {
-      const { count, error } = await supabase
-        .from('conversations')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId);
-      
-      if (error) throw error;
-      return count === 0;
-    } catch (err) {
-      console.error("Check New User Error:", err);
-      return false; // في حالة الخطأ، نفترض أنه ليس جديداً للأمان
-    }
-  };
-
-  const checkSubscription = async (userId) => {
+const checkSubscription = async (userId) => {
+    // هذه النسخة بسيطة لأن قاعدة البيانات (Trigger) قامت بإنشاء الصف بالفعل
     if (!userId) { setUserTier('free'); return; }
     
-    try {
-      const { data: userData, error } = await supabase
-          .from('users')
-          .select('subscription_status')
-          .eq('id', userId)
-          .single();
-      
-      if (error && error.code !== 'PGRST116') { 
-        console.error("Sub check error:", error);
+    const { data: userData, error } = await supabase
+        .from('users')
+        .select('subscription_status')
+        .eq('id', userId)
+        .single();
+    
+    if (error) { 
+        // في حالة حدوث أي خطأ، نعتبره مجانياً ولا نوقف التطبيق
+        console.error("Subscription check error:", error);
         setUserTier('free'); 
-        return; 
-      }
-
-      if (userData) {
-          setUserTier(userData.subscription_status || 'free');
-      } else {
-          // محاولة إنشاء الصف بهدوء
-          await supabase.from('users').insert([{ id: userId, subscription_status: 'free' }]).select(); 
-          setUserTier('free');
-      }
-    } catch (err) {
-      console.error("Critical Sub Check Error:", err);
-      setUserTier('free');
+    } else if (userData) {
+        setUserTier(userData.subscription_status || 'free');
     }
   };
 
