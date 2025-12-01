@@ -16,7 +16,7 @@ export default function FlowCraftLang() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentLesson, setCurrentLesson] = useState(1);
-  const [maxLesson, setMaxLesson] = useState(1); // ✅ Track progress
+  const [maxLesson, setMaxLesson] = useState(1);
   const [isNewUser, setIsNewUser] = useState(false);
   const [view, setView] = useState('home');
   const [msgCount, setMsgCount] = useState(0);
@@ -39,15 +39,12 @@ export default function FlowCraftLang() {
   const fetchUsageStats = async (userId) => {
     const today = new Date().toISOString().split('T')[0];
     try {
-        // 1. New User Check
         const { count: totalCount } = await supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('user_id', userId);
         setIsNewUser(totalCount === 0);
 
-        // 2. Daily Limit Check
         const { count: todayCount } = await supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', today).eq('role', 'user');
         setMsgCount(todayCount || 0);
-
-        // 3. Progress Check (Curriculum)
+        
         const { data: userData } = await supabase.from('users').select('current_lesson').eq('id', userId).single();
         if (userData) {
             const savedLesson = userData.current_lesson || 1;
@@ -78,7 +75,6 @@ export default function FlowCraftLang() {
       } else {
         result = await supabase.auth.signInWithPassword({ email, password });
       }
-
       if (result.error) {
           setAuthMessage(result.error.message);
       } else if (isSignUp) {
@@ -98,11 +94,8 @@ export default function FlowCraftLang() {
     if (!window.speechSynthesis) return;
     const cleanText = text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
     window.speechSynthesis.cancel();
-    
     const voices = window.speechSynthesis.getVoices();
-    const japanVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || 
-                       voices.find(v => v.lang === 'ja-JP');
-    
+    const japanVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || voices.find(v => v.lang === 'ja-JP');
     const utterance = new SpeechSynthesisUtterance(cleanText);
     if (japanVoice) { utterance.voice = japanVoice; utterance.lang = 'ja-JP'; } else { utterance.lang = 'ja-JP'; }
     utterance.rate = 1.0; utterance.pitch = 1.1;
@@ -130,16 +123,13 @@ export default function FlowCraftLang() {
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || "Server Error");
 
-      setMsgCount(prev => prev + 1);
+      setMsgCount(prev => prev + 1); // تحديث العداد محلياً
 
       const aiMsgContent = data.message || "Error: No response";
       
-      // Handle Lesson Completion / Exam Pass
       if (aiMsgContent.includes("LESSON_COMPLETE") || aiMsgContent.includes("[EXAM_PASSED]")) {
          const cleanMsg = aiMsgContent.replace(/\[.*?\]/g, ""); 
-         setMessages(prev => [...prev, { role: 'assistant', content: cleanMsg + "\n\n✨ Progress Saved! Press 'Next' to continue." }]);
-         
-         // Unlock next lesson Logic
+         setMessages(prev => [...prev, { role: 'assistant', content: cleanMsg + "\n\n🎉 Level Up! Press 'Next' to continue." }]);
          if (currentLesson === maxLesson) {
              const nextLesson = maxLesson + 1;
              setMaxLesson(nextLesson);
@@ -162,14 +152,12 @@ export default function FlowCraftLang() {
 
   const handleCryptoUpgrade = async (tier) => {
     if (!session?.user?.id) { alert("Please log in first."); return; }
-    
     let priceDisplay = "";
     if (billingCycle === 'yearly') {
         priceDisplay = tier === 'premium' ? "$140 (Yearly)" : "$84 (Yearly)";
     } else {
         priceDisplay = tier === 'premium' ? "$17 (Monthly)" : "$10 (Monthly)";
     }
-    
     if(!window.confirm(`Start training with ${tier.toUpperCase()} for ${priceDisplay}?`)) return;
 
     setLoading(true);
@@ -177,11 +165,7 @@ export default function FlowCraftLang() {
       const response = await fetch('/api/create-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            userId: session.user.id, 
-            tier: tier, 
-            cycle: billingCycle 
-        })
+        body: JSON.stringify({ userId: session.user.id, tier: tier, cycle: billingCycle })
       });
       const data = await response.json();
       if (!response.ok || data.error) throw new Error(data.error || 'Invoice creation failed.');
@@ -206,19 +190,8 @@ export default function FlowCraftLang() {
         }
       } catch (err) { console.error("Auth Check Error:", err); } finally { setAuthLoading(false); }
     };
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) handleAuthCheck(session);
-      else setAuthLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) handleAuthCheck(session);
-      else setAuthLoading(false);
-    });
-
+    supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); if (session) handleAuthCheck(session); else setAuthLoading(false); });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => { setSession(session); if (session) handleAuthCheck(session); else setAuthLoading(false); });
     return () => subscription.unsubscribe();
   }, []);
 
@@ -282,9 +255,13 @@ export default function FlowCraftLang() {
     const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Shinobi";
     const messagesLeft = Math.max(0, 3 - msgCount);
     
-    const hasChatAccess = userTier === 'premium' || userTier === 'chat';
-    const hasLessonsAccess = userTier === 'premium' || userTier === 'lessons';
+    // 🛑 HERE IS THE FIX: Define access based on Payment Status AND Free Limit 🛑
     const isFree = userTier === 'free';
+    const limitReached = isFree && msgCount >= 3;
+
+    // Allow access if (Premium/Paid) OR (Free AND Limit NOT Reached)
+    const canEnterChat = !isFree || (isFree && !limitReached);
+    const canEnterLessons = !isFree || (isFree && !limitReached);
 
     return (
       <div className="min-h-screen bg-[#050505] anime-grid-bg text-white p-6 flex flex-col items-center justify-center">
@@ -302,15 +279,15 @@ export default function FlowCraftLang() {
             </button>
         </div>
 
-        {/* BANNER */}
+        {/* PAYWALL BANNER */}
         {isFree && (
-            <div className={`mb-8 p-6 rounded-2xl max-w-4xl w-full flex flex-col md:flex-row justify-between items-center shadow-lg border-2 gap-4 text-center md:text-left transition-all duration-500 ${msgCount >= 3 ? "bg-red-900/20 border-red-500/50 shadow-red-500/20" : "bg-emerald-900/20 border-emerald-500/50 shadow-emerald-500/20"}`}>
+            <div className={`mb-8 p-6 rounded-2xl max-w-4xl w-full flex flex-col md:flex-row justify-between items-center shadow-lg border-2 gap-4 text-center md:text-left transition-all duration-500 ${limitReached ? "bg-red-900/20 border-red-500/50 shadow-red-500/20" : "bg-emerald-900/20 border-emerald-500/50 shadow-emerald-500/20"}`}>
                 <div>
-                    <p className={`text-xl font-manga tracking-wide ${msgCount >= 3 ? "text-red-400" : "text-emerald-400"}`}>
-                        {msgCount >= 3 ? "⚠ DAILY LIMIT REACHED" : "✅ FREE TRAINING ACTIVE"}
+                    <p className={`text-xl font-manga tracking-wide ${limitReached ? "text-red-400" : "text-emerald-400"}`}>
+                        {limitReached ? "⚠ DAILY LIMIT REACHED" : "✅ FREE TRAINING ACTIVE"}
                     </p>
                     <p className="text-sm text-gray-300 mt-1">
-                        {msgCount >= 3 ? "Your chakra is depleted. Upgrade to recharge immediately." : `You have ${messagesLeft} energy points left for today.`}
+                        {limitReached ? "Your chakra is depleted. Upgrade to recharge immediately." : `You have ${messagesLeft} energy points left for today.`}
                     </p>
                 </div>
                 <button onClick={() => handleCryptoUpgrade('premium')} className="bg-anime-warning text-black font-black px-8 py-3 rounded-xl hover:scale-105 active:scale-95 transition shadow-[0_0_20px_#facc15] flex items-center gap-2">
@@ -322,16 +299,24 @@ export default function FlowCraftLang() {
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
           {/* Chat Card */}
           <button 
-            onClick={() => hasChatAccess ? setMode('chat') : null}
-            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${hasChatAccess ? 'bg-[#1e293b]/50 border-2 border-anime-primary/50 hover:border-anime-primary hover:shadow-[0_0_30px_rgba(56,189,248,0.3)]' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80'}`}
+            onClick={() => canEnterChat ? setMode('chat') : null} 
+            // ✅ DISABLED Only if Limit is Reached (Not just because it's free)
+            disabled={!canEnterChat} 
+            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${
+                canEnterChat 
+                ? 'bg-[#1e293b]/50 border-2 border-anime-primary/50 hover:border-anime-primary hover:shadow-[0_0_30px_rgba(56,189,248,0.3)] cursor-pointer' 
+                : 'bg-gray-900/50 border border-white/5 grayscale opacity-80 cursor-not-allowed'
+            }`}
           >
              <div className="absolute inset-0 bg-gradient-to-br from-anime-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"/>
              <MessageCircle size={48} className="text-anime-primary mb-4" />
              <h2 className="text-3xl font-manga mb-2 text-white">Free Chat</h2>
              <p className="text-gray-400">Roleplay with AI Sensei. Talk about Anime, Manga, and Life.</p>
-             {!hasChatAccess && (
+             
+             {/* Show Unlock option ONLY if they are free users (Always offer upgrade) */}
+             {isFree && (
                 <div className="absolute top-6 right-6 flex flex-col items-end gap-3">
-                    <Lock className="text-red-500 drop-shadow-lg" size={28} />
+                    <Lock className={`drop-shadow-lg ${limitReached ? "text-red-500" : "text-gray-500"}`} size={28} />
                     <div onClick={(e) => { e.stopPropagation(); handleCryptoUpgrade('chat'); }} className="bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 text-xs font-bold text-white px-4 py-2 rounded-lg cursor-pointer transition">
                         Unlock ({billingCycle === 'monthly' ? '$10' : '$84'})
                     </div>
@@ -341,16 +326,22 @@ export default function FlowCraftLang() {
 
           {/* Lessons Card */}
           <button 
-            onClick={() => hasLessonsAccess ? setMode('lessons') : null}
-            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${hasLessonsAccess ? 'bg-[#1e293b]/50 border-2 border-anime-accent/50 hover:border-anime-accent hover:shadow-[0_0_30px_rgba(244,114,182,0.3)]' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80'}`}
+            onClick={() => canEnterLessons ? setMode('lessons') : null}
+            disabled={!canEnterLessons}
+            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${
+                canEnterLessons 
+                ? 'bg-[#1e293b]/50 border-2 border-anime-accent/50 hover:border-anime-accent hover:shadow-[0_0_30px_rgba(244,114,182,0.3)] cursor-pointer' 
+                : 'bg-gray-900/50 border border-white/5 grayscale opacity-80 cursor-not-allowed'
+            }`}
           >
              <div className="absolute inset-0 bg-gradient-to-br from-anime-accent/10 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"/>
              <BookOpen size={48} className="text-anime-accent mb-4" />
              <h2 className="text-3xl font-manga mb-2 text-white">The Path</h2>
              <p className="text-gray-400">Structured Ninja curriculum. From Genin basics to Kage fluency.</p>
-             {!hasLessonsAccess && (
+             
+             {isFree && (
                 <div className="absolute top-6 right-6 flex flex-col items-end gap-3">
-                    <Lock className="text-red-500 drop-shadow-lg" size={28} />
+                    <Lock className={`drop-shadow-lg ${limitReached ? "text-red-500" : "text-gray-500"}`} size={28} />
                     <div onClick={(e) => { e.stopPropagation(); handleCryptoUpgrade('lessons'); }} className="bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 text-xs font-bold text-white px-4 py-2 rounded-lg cursor-pointer transition">
                         Unlock ({billingCycle === 'monthly' ? '$10' : '$84'})
                     </div>
@@ -390,28 +381,8 @@ export default function FlowCraftLang() {
               {/* NAVIGATION BUTTONS (Lessons Only) */}
               {mode === 'lessons' && (
                   <div className="flex gap-2 ml-4">
-                      <button 
-                        onClick={() => {
-                            setMessages([]); 
-                            setCurrentLesson(prev => Math.max(1, prev - 1));
-                        }}
-                        disabled={currentLesson === 1}
-                        className="p-2 bg-white/10 rounded hover:bg-white/20 disabled:opacity-30 transition"
-                      >
-                        ← Prev
-                      </button>
-                      
-                      <button 
-                        onClick={() => {
-                            setMessages([]); 
-                            setCurrentLesson(prev => prev + 1);
-                        }}
-                        // Lock Next if not completed
-                        disabled={currentLesson >= maxLesson}
-                        className="p-2 bg-anime-primary text-black rounded font-bold hover:bg-cyan-400 disabled:opacity-30 disabled:bg-gray-600 disabled:text-gray-400 transition"
-                      >
-                        Next →
-                      </button>
+                      <button onClick={() => { setMessages([]); setCurrentLesson(prev => Math.max(1, prev - 1)); }} disabled={currentLesson === 1} className="p-2 bg-white/10 rounded hover:bg-white/20 disabled:opacity-30 transition">← Prev</button>
+                      <button onClick={() => { setMessages([]); setCurrentLesson(prev => prev + 1); }} disabled={currentLesson >= maxLesson} className="p-2 bg-anime-primary text-black rounded font-bold hover:bg-cyan-400 disabled:opacity-30 disabled:bg-gray-600 disabled:text-gray-400 transition">Next →</button>
                   </div>
               )}
           </div>
