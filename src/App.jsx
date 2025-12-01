@@ -481,7 +481,7 @@ export default function FlowCraftLang() {
 
 
 
-  // E. CHAT INTERFACE
+    // E. CHAT INTERFACE
   return (
     <div className="flex h-screen bg-[#050505] text-white font-sans overflow-hidden">
       <div className="md:hidden fixed top-0 w-full bg-[#050505]/90 backdrop-blur border-b border-white/10 p-4 flex justify-between items-center z-50">
@@ -498,6 +498,52 @@ export default function FlowCraftLang() {
         <div className="h-20 border-b border-white/5 hidden md:flex items-center px-8 justify-between bg-[#050505]/50 backdrop-blur z-10">
           <div className="flex items-center gap-4">
               <h2 className="font-bold text-xl">{mode === 'chat' ? '💬 Free Chat' : `⚔️ Lesson ${currentLesson}`}</h2>
+              {mode === 'lessons' && (
+                  <div className="flex gap-2 ml-4">
+                      <button onClick={() => { setMessages([]); setCurrentLesson(prev => Math.max(1, prev - 1)); }} disabled={currentLesson === 1} className="p-2 bg-white/10 rounded hover:bg-white/20 disabled:opacity-30 transition">← Prev</button>
+                      <button onClick={() => { setMessages([]); setCurrentLesson(prev => prev + 1); }} disabled={currentLesson >= maxLesson} className="p-2 bg-anime-primary text-black rounded font-bold hover:bg-cyan-400 disabled:opacity-30 disabled:bg-gray-600 disabled:text-gray-400 transition">Next →</button>
+                  </div>
+              )}
+          </div>
+          {userTier !== 'premium' && <button onClick={() => handleCryptoUpgrade('premium')} className="text-xs bg-anime-warning text-black px-4 py-2 rounded-lg font-bold hover:shadow-[0_0_15px_#facc15] transition">UPGRADE ALL</button>}
+        </div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {messages.length === 0 && <div className="text-center text-gray-500 mt-20"><p className="text-6xl mb-4 grayscale opacity-50">🎌</p><p className="font-manga text-xl">Say "Osu!" to begin.</p></div>}
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[85%] md:max-w-2xl p-5 rounded-2xl shadow-lg ${msg.role === 'user' ? 'bg-anime-primary text-black font-bold rounded-tr-none' : 'bg-[#1e293b] border border-white/10 rounded-tl-none'}`}>
+                <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+                {msg.role === 'assistant' && <button onClick={() => speak(msg.content)} className="mt-3 text-xs opacity-60 hover:opacity-100 flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-full transition"><Volume2 size={14}/> Listen</button>}
+              </div>
+            </div>
+          ))}
+          {loading && <div className="text-anime-accent animate-pulse pl-6 font-manga tracking-widest">SENSEI IS TYPING...</div>}
+          <div ref={scrollRef}/>
+        </div>
+        
+        {/* منطقة الإدخال الجديدة مع الميكروفون */}
+        <div className="p-6 border-t border-white/5 bg-[#050505]">
+          <div className="max-w-4xl mx-auto relative flex items-center gap-3">
+            {/* زر الميكروفون */}
+            <button 
+              onClick={toggleListening}
+              className={`p-3 rounded-full transition-all duration-300 ${isListening ? 'bg-red-500 text-white animate-pulse shadow-[0_0_15px_#ef4444]' : 'bg-[#1e293b] text-gray-400 hover:text-white border border-white/10'}`}
+            >
+               {isListening ? <MicOff size={20}/> : <Mic size={20}/>}
+            </button>
+
+            <div className="relative flex-1">
+              <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} placeholder={isListening ? "Listening (Japanese)..." : "Type your message..."} className="w-full bg-[#1e293b] border border-white/10 rounded-full py-4 px-6 pr-14 focus:outline-none focus:border-anime-primary focus:shadow-[0_0_20px_rgba(56,189,248,0.2)] text-white placeholder-gray-600 transition-all" />
+              <button onClick={handleSend} disabled={loading} className="absolute right-2 top-2 p-2 bg-anime-primary rounded-full text-black hover:bg-cyan-300 hover:scale-110 transition disabled:opacity-50 disabled:scale-100"><Send size={20} /></button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
               {/* ✅ NAVIGATION BUTTONS */}
               {mode === 'lessons' && (
                   <div className="flex gap-2 ml-4">
