@@ -56,7 +56,7 @@ export default async function handler(req, res) {
 
     // ج. التحقق من الحد اليومي (للمستخدمين غير النشطين فقط)
     if (subscriptionStatus !== 'active') {
-        const DAILY_LIMIT = 3; 
+        const DAILY_LIMIT = 10; 
         
         // ✅ حساب بداية اليوم بتوقيت UTC دقيق (00:00:00)
         // هذا يضمن أن العداد يتصفر كل يوم جديد
