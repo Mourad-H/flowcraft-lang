@@ -6,7 +6,7 @@ import { RefundPolicy } from './RefundPolicy';
 
 export default function FlowCraftLang() {
   // ==========================================
-  // 1. ALL STATES
+  // 1. ALL STATES (الحالات)
   // ==========================================
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -18,7 +18,7 @@ export default function FlowCraftLang() {
   const [currentLesson, setCurrentLesson] = useState(1);
   const [isNewUser, setIsNewUser] = useState(false);
   const [view, setView] = useState('home');
-  const [msgCount, setMsgCount] = useState(0); // ✅ عداد الرسائل اليومي
+  const [msgCount, setMsgCount] = useState(0); // عداد الرسائل
   
   // Auth Form States
   const [email, setEmail] = useState('');
@@ -29,15 +29,15 @@ export default function FlowCraftLang() {
   const scrollRef = useRef(null);
 
   // ==========================================
-  // 2. HELPER FUNCTIONS
+  // 2. HELPER FUNCTIONS (الدوال)
   // ==========================================
 
-  // تحديث: دالة ذكية تجلب عدد رسائل اليوم فقط
+  // دالة جلب الإحصائيات (جديد أم قديم + عدد رسائل اليوم)
   const fetchUsageStats = async (userId) => {
-    const today = new Date().toISOString().split('T')[0]; // تاريخ اليوم YYYY-MM-DD
+    const today = new Date().toISOString().split('T')[0];
     
     try {
-        // 1. هل هو جديد كلياً؟
+        // 1. هل هو جديد؟
         const { count: totalCount } = await supabase
             .from('conversations')
             .select('id', { count: 'exact', head: true })
@@ -45,7 +45,7 @@ export default function FlowCraftLang() {
         
         setIsNewUser(totalCount === 0);
 
-        // 2. كم رسالة أرسل اليوم؟ (لمطابقة منطق الباك-إند)
+        // 2. كم رسالة اليوم؟
         const { count: todayCount } = await supabase
             .from('conversations')
             .select('id', { count: 'exact', head: true })
@@ -147,7 +147,7 @@ export default function FlowCraftLang() {
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || "Server Error");
 
-      // تحديث العداد محلياً فوراً لكي لا يضطر المستخدم لعمل ريفريش
+      // تحديث العداد محلياً فوراً
       setMsgCount(prev => prev + 1);
 
       const aiMsgContent = data.message || "Error: No response";
@@ -164,8 +164,7 @@ export default function FlowCraftLang() {
       let errorMessage = err.message || "Unknown Error";
       if (errorMessage.includes("LIMIT_EXCEEDED")) {
           alert("LIMIT EXCEEDED: Your 3 free messages are done for today! Upgrade to Premium to continue your training. ⚔️");
-          // تحديث العداد للتأكيد
-          setMsgCount(3); 
+          setMsgCount(3); // تأكيد القفل في الواجهة
       } else if (errorMessage.includes("Server Error") || errorMessage.includes("Groq API Error")) {
           alert("SYSTEM ERROR: AI service unavailable. Try again later.");
       } else {
@@ -203,10 +202,9 @@ export default function FlowCraftLang() {
     const handleAuthCheck = async (currentSession) => {
       try {
         if (currentSession?.user) {
-          // جلب كل البيانات دفعة واحدة (الاشتراك + العداد)
           await Promise.all([
              checkSubscription(currentSession.user.id),
-             fetchUsageStats(currentSession.user.id) // ✅ الدالة الجديدة
+             fetchUsageStats(currentSession.user.id)
           ]);
         }
       } catch (err) {
@@ -253,7 +251,7 @@ export default function FlowCraftLang() {
   if (view === 'privacy') return <PrivacyPolicy setView={setView} />;
   if (view === 'refund') return <RefundPolicy setView={setView} />;
 
-  // C. Auth Screen
+  // C. Auth Screen (Landing Page)
   if (!session) {
     return (
       <div className="min-h-screen bg-anime-bg text-white font-sans selection:bg-anime-accent selection:text-white">
@@ -318,10 +316,10 @@ export default function FlowCraftLang() {
     );
   }
 
-  // D. Dashboard (هنا التغيير الذكي للافتة)
+  // D. Dashboard (مع الـ Footer القانوني)
   if (!mode) {
     const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Shinobi";
-    const messagesLeft = Math.max(0, 3 - msgCount); // حساب المتبقي
+    const messagesLeft = Math.max(0, 3 - msgCount); 
 
     return (
       <div className="min-h-screen bg-anime-bg text-white p-6 flex flex-col items-center justify-center">
@@ -330,12 +328,12 @@ export default function FlowCraftLang() {
             <span className="text-anime-primary">{userName}</span>-san!
         </h1>
         
-        {/* ✅ اللافتة الديناميكية */}
+        {/* PAYWALL BANNER */}
         {userTier === 'free' && (
-            <div className={`mb-8 p-6 rounded-xl max-w-4xl w-full flex justify-between items-center shadow-lg border-2 ${
+            <div className={`mb-8 p-6 rounded-xl max-w-4xl w-full flex flex-col md:flex-row justify-between items-center shadow-lg border-2 gap-4 text-center md:text-left ${
                 msgCount >= 3 
-                ? "bg-gradient-to-r from-red-900/50 to-red-600/20 border-red-500" // أحمر: انتهى الرصيد
-                : "bg-gradient-to-r from-green-900/50 to-emerald-600/20 border-green-500" // أخضر: مسموح
+                ? "bg-gradient-to-r from-red-900/50 to-red-600/20 border-red-500" 
+                : "bg-gradient-to-r from-green-900/50 to-emerald-600/20 border-green-500" 
             }`}>
                 <div>
                     <p className={`text-lg font-bold ${msgCount >= 3 ? "text-red-400" : "text-green-400"}`}>
@@ -357,7 +355,6 @@ export default function FlowCraftLang() {
         )}
 
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
-          {/* الأزرار: نغلقها فقط إذا وصل الحد 3 */}
           <button 
             onClick={() => setMode('chat')} 
             disabled={userTier === 'free' && msgCount >= 3} 
@@ -392,6 +389,13 @@ export default function FlowCraftLang() {
         <button onClick={handleLogout} className="mt-8 text-gray-500 hover:text-white text-sm flex gap-2 items-center">
             <LogOut size={16}/> Log Out
         </button>
+
+        {/* ✅ FOOTER IS HERE TOO */}
+        <footer className="mt-12 text-gray-600 text-xs flex gap-6">
+            <button onClick={() => setView('privacy')} className="hover:text-white transition">Privacy Policy</button>
+            <button onClick={() => setView('refund')} className="hover:text-white transition">Refund Policy</button>
+            <a href="mailto:support@flowcraftco.com" className="hover:text-white transition">Contact Support</a>
+        </footer>
       </div>
     );
   }
@@ -399,7 +403,6 @@ export default function FlowCraftLang() {
   // E. Chat Interface
   return (
     <div className="flex h-screen bg-anime-bg text-white font-sans overflow-hidden">
-      {/* ... (نفس كود الشات السابق، لا تغيير) ... */}
       <div className="md:hidden fixed top-0 w-full bg-anime-bg/90 backdrop-blur border-b border-white/5 p-4 flex justify-between items-center z-50">
         <div className="font-bold text-anime-primary">FlowCraft</div>
         <button onClick={() => setMode(null)} className="text-xs bg-white/10 px-3 py-1 rounded">Menu</button>
