@@ -346,7 +346,7 @@ export default function FlowCraftLang() {
     );
   }
 
-   // DASHBOARD
+     // DASHBOARD
   if (!mode) {
     const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Shinobi";
     const messagesLeft = Math.max(0, 3 - msgCount);
@@ -454,6 +454,7 @@ export default function FlowCraftLang() {
       </div>
     );
   }
+
 
 
   // E. CHAT INTERFACE
