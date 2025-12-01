@@ -110,17 +110,50 @@ export default function FlowCraftLang() {
     setSession(null);
   };
 
-  const speak = (text) => {
+    const speak = (text) => {
     if (!window.speechSynthesis) return;
-    const cleanText = text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
+    
+    // إيقاف أي كلام سابق
     window.speechSynthesis.cancel();
-    const voices = window.speechSynthesis.getVoices();
-    const japanVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || voices.find(v => v.lang === 'ja-JP');
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    if (japanVoice) { utterance.voice = japanVoice; utterance.lang = 'ja-JP'; } else { utterance.lang = 'ja-JP'; }
-    utterance.rate = 1.0; utterance.pitch = 1.1;
+
+    // 1. التحقق: هل النص يحتوي على رموز يابانية؟
+    const hasJapanese = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/.test(text);
+    
+    let utterance;
+    let cleanText = text;
+
+    if (hasJapanese) {
+        // 🎌 حالة اليابانية:
+        // نحذف الحروف الإنجليزية (الروماجي) والأقواس لتجنب التكرار واللكنة السيئة
+        // النتيجة: سيقرأ "Sugoi!" باليابانية فقط ولن يقرأ الترجمة الإنجليزية
+        cleanText = text.replace(/[a-zA-Z]/g, '').replace(/[()]/g, '').trim();
+        
+        utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = 'ja-JP'; // فرض الصوت الياباني
+        
+        // البحث عن أفضل صوت ياباني
+        const voices = window.speechSynthesis.getVoices();
+        const japanVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja"));
+        if (japanVoice) utterance.voice = japanVoice;
+
+    } else {
+        // 🇺🇸 حالة الإنجليزية فقط (للشروحات):
+        // نستخدم صوتاً إنجليزياً ليكون النطق سليماً
+        utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        
+        const voices = window.speechSynthesis.getVoices();
+        const engVoice = voices.find(v => v.lang.includes('en'));
+        if (engVoice) utterance.voice = engVoice;
+    }
+
+    // إعدادات السرعة
+    utterance.rate = 1.0; 
+    utterance.pitch = 1.1; 
+
     window.speechSynthesis.speak(utterance);
   };
+
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
