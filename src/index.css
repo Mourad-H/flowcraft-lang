@@ -2,7 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-/* لضمان أن خلفية الصفحة سوداء فوراً */
 body {
-  background-color: #0f172a; 
+  background-color: #050505;
+  font-family: 'Outfit', sans-serif;
+  overflow-x: hidden;
+}
+
+/* خلفية سايبربانك (Grid Background) */
+.anime-grid-bg {
+  background-image: 
+    linear-gradient(rgba(56, 189, 248, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.1) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center top;
+  mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+}
+
+/* تأثير التوهج للنصوص */
+.neon-text {
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.5), 0 0 20px rgba(56, 189, 248, 0.3);
+}
+
+/* تأثير التوهج للحدود */
+.neon-border {
+  box-shadow: 0 0 15px rgba(244, 114, 182, 0.3);
+}
+
+/* خط العناوين */
+.font-manga {
+  font-family: 'Bangers', cursive;
+  letter-spacing: 2px;
 }
