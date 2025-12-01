@@ -346,16 +346,16 @@ export default function FlowCraftLang() {
     );
   }
 
-     // DASHBOARD
+       // 2. DASHBOARD
   if (!mode) {
     const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Shinobi";
     const messagesLeft = Math.max(0, 3 - msgCount);
     
-    // 🛑 المنطق الجديد: السماح بالدخول إذا كان دافعاً أو مجانياً ضمن الحد
+    // 🛑 المنطق الصحيح:
     const isFree = userTier === 'free';
-    const limitReached = isFree && msgCount >= 3;
+    const limitReached = isFree && msgCount >= 3; // هل انتهى الرصيد المجاني؟
 
-    // السماح بالدخول: (إذا كان مدفوعاً) أو (إذا كان مجانياً ولم يصل للحد)
+    // السماح بالدخول: (إذا دفعت) أو (إذا كنت مجانياً ولم ينتهِ رصيدك)
     const canEnterChat = (userTier === 'premium' || userTier === 'chat') || (isFree && !limitReached);
     const canEnterLessons = (userTier === 'premium' || userTier === 'lessons') || (isFree && !limitReached);
 
@@ -366,7 +366,7 @@ export default function FlowCraftLang() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-anime-primary to-anime-accent ml-2">{userName}</span>-san!
         </h1>
         
-        {/* TOGGLE */}
+        {/* TOGGLE BUTTONS */}
         <div className="relative flex items-center bg-gray-900/80 backdrop-blur border border-white/10 rounded-full p-1 mb-10 w-64 h-12 shadow-2xl cursor-pointer">
             <div className={`absolute left-1 top-1 bottom-1 w-[calc(50%-4px)] bg-gradient-to-r from-anime-accent to-purple-600 rounded-full transition-all duration-300 ease-in-out shadow-[0_0_15px_#f472b6] ${billingCycle === 'yearly' ? 'translate-x-full' : 'translate-x-0'}`}></div>
             <button onClick={() => setBillingCycle('monthly')} className="w-1/2 relative z-10 font-bold text-sm transition-colors duration-300 text-center">Monthly</button>
@@ -375,7 +375,7 @@ export default function FlowCraftLang() {
             </button>
         </div>
 
-        {/* PAYWALL BANNER */}
+        {/* PAYWALL BANNER (يظهر للمجاني فقط) */}
         {isFree && (
             <div className={`mb-8 p-6 rounded-2xl max-w-4xl w-full flex flex-col md:flex-row justify-between items-center shadow-lg border-2 gap-4 text-center md:text-left transition-all duration-500 ${limitReached ? "bg-red-900/20 border-red-500/50 shadow-red-500/20" : "bg-emerald-900/20 border-emerald-500/50 shadow-emerald-500/20"}`}>
                 <div>
@@ -393,9 +393,15 @@ export default function FlowCraftLang() {
         )}
 
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
-          {/* Chat Card (مفتوح للمجاني إذا لم ينته الحد) */}
+          
+          {/* ✅ بطاقة الشات (مفتوحة للمجاني إذا لم يصل للحد) */}
           <button 
-            onClick={() => canEnterChat ? enterMode('chat') : null} 
+            onClick={() => {
+                if (canEnterChat) {
+                    setMode('chat');
+                    setMessages([{ role: 'assistant', content: "Yo! FlowSensei here. 🕶️\n\nI'm ready to chat about anything! What anime are you watching?" }]);
+                }
+            }}
             disabled={!canEnterChat} 
             className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${
                 canEnterChat 
@@ -408,20 +414,31 @@ export default function FlowCraftLang() {
              <h2 className="text-3xl font-manga mb-2 text-white">Free Chat</h2>
              <p className="text-gray-400">Roleplay with AI Sensei. Talk about Anime, Manga, and Life.</p>
              
-             {/* عرض خيار الشراء إذا لم يكن يملك الباقة (حتى لو كان الدخول مسموحاً له مجاناً) */}
+             {/* إظهار القفل فقط إذا انتهى الرصيد */}
+             {isFree && limitReached && (
+                <div className="absolute top-6 right-6">
+                    <Lock className="text-red-500 drop-shadow-lg" size={28} />
+                </div>
+             )}
+             
+             {/* زر الشراء الجانبي (يظهر دائماً للمجاني كخيار) */}
              {isFree && (
-                <div className="absolute top-6 right-6 flex flex-col items-end gap-3">
-                    <Lock className={`drop-shadow-lg ${limitReached ? "text-red-500" : "text-gray-500"}`} size={28} />
+                <div className="absolute bottom-6 right-6 z-20">
                     <div onClick={(e) => { e.stopPropagation(); handleCryptoUpgrade('chat'); }} className="bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 text-xs font-bold text-white px-4 py-2 rounded-lg cursor-pointer transition">
                         Unlock ({billingCycle === 'monthly' ? '$10' : '$84'})
                     </div>
                 </div>
-             )} 
+             )}
           </button>
 
-          {/* Lessons Card (مفتوح للمجاني إذا لم ينته الحد) */}
+          {/* ✅ بطاقة الدروس (مفتوحة للمجاني إذا لم يصل للحد) */}
           <button 
-            onClick={() => canEnterLessons ? enterMode('lessons') : null}
+            onClick={() => {
+                if (canEnterLessons) {
+                    setMode('lessons');
+                    setMessages([{ role: 'assistant', content: `Osu! 🥋\n\nWelcome to **Lesson ${currentLesson}**.\nLet's begin your training!` }]);
+                }
+            }}
             disabled={!canEnterLessons}
             className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${
                 canEnterLessons 
@@ -434,18 +451,25 @@ export default function FlowCraftLang() {
              <h2 className="text-3xl font-manga mb-2 text-white">The Path</h2>
              <p className="text-gray-400">Structured Ninja curriculum. From Genin basics to Kage fluency.</p>
              
+             {isFree && limitReached && (
+                <div className="absolute top-6 right-6">
+                    <Lock className="text-red-500 drop-shadow-lg" size={28} />
+                </div>
+             )}
+
              {isFree && (
-                <div className="absolute top-6 right-6 flex flex-col items-end gap-3">
-                    <Lock className={`drop-shadow-lg ${limitReached ? "text-red-500" : "text-gray-500"}`} size={28} />
+                <div className="absolute bottom-6 right-6 z-20">
                     <div onClick={(e) => { e.stopPropagation(); handleCryptoUpgrade('lessons'); }} className="bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 text-xs font-bold text-white px-4 py-2 rounded-lg cursor-pointer transition">
                         Unlock ({billingCycle === 'monthly' ? '$10' : '$84'})
                     </div>
                 </div>
-             )} 
+             )}
           </button>
         </div>
         
         <button onClick={handleLogout} className="mt-12 text-neon-red text-sm flex gap-2 items-center font-bold tracking-wide transition"><LogOut size={18} className="drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]"/> ABORT MISSION (LOG OUT)</button>
+        
+        {/* Footer with Neon Glow */}
         <footer className="mt-10 mb-6 flex gap-8">
             <button onClick={() => setView('privacy')} className="text-neon-white text-xs font-bold tracking-widest uppercase">Privacy Protocol</button>
             <button onClick={() => setView('refund')} className="text-neon-white text-xs font-bold tracking-widest uppercase">Refund Rules</button>
