@@ -346,14 +346,18 @@ export default function FlowCraftLang() {
     );
   }
 
-  // DASHBOARD
+   // DASHBOARD
   if (!mode) {
     const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Shinobi";
     const messagesLeft = Math.max(0, 3 - msgCount);
     
-    const hasChatAccess = userTier === 'premium' || userTier === 'chat';
-    const hasLessonsAccess = userTier === 'premium' || userTier === 'lessons';
+    // 🛑 المنطق الجديد: السماح بالدخول إذا كان دافعاً أو مجانياً ضمن الحد
     const isFree = userTier === 'free';
+    const limitReached = isFree && msgCount >= 3;
+
+    // السماح بالدخول: (إذا كان مدفوعاً) أو (إذا كان مجانياً ولم يصل للحد)
+    const canEnterChat = (userTier === 'premium' || userTier === 'chat') || (isFree && !limitReached);
+    const canEnterLessons = (userTier === 'premium' || userTier === 'lessons') || (isFree && !limitReached);
 
     return (
       <div className="min-h-screen bg-[#050505] anime-grid-bg text-white p-6 flex flex-col items-center justify-center">
@@ -373,13 +377,13 @@ export default function FlowCraftLang() {
 
         {/* PAYWALL BANNER */}
         {isFree && (
-            <div className={`mb-8 p-6 rounded-2xl max-w-4xl w-full flex flex-col md:flex-row justify-between items-center shadow-lg border-2 gap-4 text-center md:text-left transition-all duration-500 ${msgCount >= 3 ? "bg-red-900/20 border-red-500/50 shadow-red-500/20" : "bg-emerald-900/20 border-emerald-500/50 shadow-emerald-500/20"}`}>
+            <div className={`mb-8 p-6 rounded-2xl max-w-4xl w-full flex flex-col md:flex-row justify-between items-center shadow-lg border-2 gap-4 text-center md:text-left transition-all duration-500 ${limitReached ? "bg-red-900/20 border-red-500/50 shadow-red-500/20" : "bg-emerald-900/20 border-emerald-500/50 shadow-emerald-500/20"}`}>
                 <div>
-                    <p className={`text-xl font-manga tracking-wide ${msgCount >= 3 ? "text-red-400" : "text-emerald-400"}`}>
-                        {msgCount >= 3 ? "⚠ DAILY LIMIT REACHED" : "✅ FREE TRAINING ACTIVE"}
+                    <p className={`text-xl font-manga tracking-wide ${limitReached ? "text-red-400" : "text-emerald-400"}`}>
+                        {limitReached ? "⚠ DAILY LIMIT REACHED" : "✅ FREE TRAINING ACTIVE"}
                     </p>
                     <p className="text-sm text-gray-300 mt-1">
-                        {msgCount >= 3 ? "Your chakra is depleted. Upgrade to recharge immediately." : `You have ${messagesLeft} energy points left for today.`}
+                        {limitReached ? "Your chakra is depleted. Upgrade to recharge immediately." : `You have ${messagesLeft} energy points left for today.`}
                     </p>
                 </div>
                 <button onClick={() => handleCryptoUpgrade('premium')} className="bg-anime-warning text-black font-black px-8 py-3 rounded-xl hover:scale-105 active:scale-95 transition shadow-[0_0_20px_#facc15] flex items-center gap-2">
@@ -389,18 +393,25 @@ export default function FlowCraftLang() {
         )}
 
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
-          {/* Chat Card */}
+          {/* Chat Card (مفتوح للمجاني إذا لم ينته الحد) */}
           <button 
-            onClick={() => hasChatAccess ? setMode('chat') : null}
-            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${hasChatAccess ? 'bg-[#1e293b]/50 border-2 border-anime-primary/50 hover:border-anime-primary hover:shadow-[0_0_30px_rgba(56,189,248,0.3)]' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80'}`}
+            onClick={() => canEnterChat ? enterMode('chat') : null} 
+            disabled={!canEnterChat} 
+            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${
+                canEnterChat 
+                ? 'bg-[#1e293b]/50 border-2 border-anime-primary/50 hover:border-anime-primary hover:shadow-[0_0_30px_rgba(56,189,248,0.3)] cursor-pointer' 
+                : 'bg-gray-900/50 border border-white/5 grayscale opacity-80 cursor-not-allowed'
+            }`}
           >
              <div className="absolute inset-0 bg-gradient-to-br from-anime-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"/>
              <MessageCircle size={48} className="text-anime-primary mb-4" />
              <h2 className="text-3xl font-manga mb-2 text-white">Free Chat</h2>
              <p className="text-gray-400">Roleplay with AI Sensei. Talk about Anime, Manga, and Life.</p>
-             {!hasChatAccess && (
+             
+             {/* عرض خيار الشراء إذا لم يكن يملك الباقة (حتى لو كان الدخول مسموحاً له مجاناً) */}
+             {isFree && (
                 <div className="absolute top-6 right-6 flex flex-col items-end gap-3">
-                    <Lock className="text-red-500 drop-shadow-lg" size={28} />
+                    <Lock className={`drop-shadow-lg ${limitReached ? "text-red-500" : "text-gray-500"}`} size={28} />
                     <div onClick={(e) => { e.stopPropagation(); handleCryptoUpgrade('chat'); }} className="bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 text-xs font-bold text-white px-4 py-2 rounded-lg cursor-pointer transition">
                         Unlock ({billingCycle === 'monthly' ? '$10' : '$84'})
                     </div>
@@ -408,18 +419,24 @@ export default function FlowCraftLang() {
              )} 
           </button>
 
-          {/* Lessons Card */}
+          {/* Lessons Card (مفتوح للمجاني إذا لم ينته الحد) */}
           <button 
-            onClick={() => hasLessonsAccess ? setMode('lessons') : null}
-            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${hasLessonsAccess ? 'bg-[#1e293b]/50 border-2 border-anime-accent/50 hover:border-anime-accent hover:shadow-[0_0_30px_rgba(244,114,182,0.3)]' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80'}`}
+            onClick={() => canEnterLessons ? enterMode('lessons') : null}
+            disabled={!canEnterLessons}
+            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${
+                canEnterLessons 
+                ? 'bg-[#1e293b]/50 border-2 border-anime-accent/50 hover:border-anime-accent hover:shadow-[0_0_30px_rgba(244,114,182,0.3)] cursor-pointer' 
+                : 'bg-gray-900/50 border border-white/5 grayscale opacity-80 cursor-not-allowed'
+            }`}
           >
              <div className="absolute inset-0 bg-gradient-to-br from-anime-accent/10 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"/>
              <BookOpen size={48} className="text-anime-accent mb-4" />
              <h2 className="text-3xl font-manga mb-2 text-white">The Path</h2>
              <p className="text-gray-400">Structured Ninja curriculum. From Genin basics to Kage fluency.</p>
-             {!hasLessonsAccess && (
+             
+             {isFree && (
                 <div className="absolute top-6 right-6 flex flex-col items-end gap-3">
-                    <Lock className="text-red-500 drop-shadow-lg" size={28} />
+                    <Lock className={`drop-shadow-lg ${limitReached ? "text-red-500" : "text-gray-500"}`} size={28} />
                     <div onClick={(e) => { e.stopPropagation(); handleCryptoUpgrade('lessons'); }} className="bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 text-xs font-bold text-white px-4 py-2 rounded-lg cursor-pointer transition">
                         Unlock ({billingCycle === 'monthly' ? '$10' : '$84'})
                     </div>
@@ -437,6 +454,7 @@ export default function FlowCraftLang() {
       </div>
     );
   }
+
 
   // E. CHAT INTERFACE
   return (
