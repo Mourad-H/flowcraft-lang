@@ -33,3 +33,28 @@ body {
   font-family: 'Bangers', cursive;
   letter-spacing: 2px;
 }
+
+/* توهج أبيض للنصوص السفلية */
+.text-neon-white {
+  color: #e2e8f0; /* رمادي فاتح جداً */
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.2), 0 0 10px rgba(56, 189, 248, 0.1);
+  transition: all 0.3s ease;
+}
+
+.text-neon-white:hover {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.8), 0 0 15px rgba(244, 114, 182, 0.6);
+  transform: translateY(-1px);
+}
+
+/* توهج أحمر لزر الخروج */
+.text-neon-red {
+  color: #f87171;
+  text-shadow: 0 0 5px rgba(239, 68, 68, 0.3);
+  transition: all 0.3s ease;
+}
+
+.text-neon-red:hover {
+  color: #ff0000;
+  text-shadow: 0 0 10px rgba(255, 0, 0, 0.8), 0 0 20px rgba(255, 0, 0, 0.4);
+}
