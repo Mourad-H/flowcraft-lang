@@ -76,23 +76,45 @@ export default function FlowCraftLang() {
     recognition.start();
   };
 
-  const fetchUsageStats = async (userId) => {
-    const today = new Date().toISOString().split('T')[0];
+    const fetchUsageStats = async (userId) => {
+    // ✅ 1. توحيد التوقيت (UTC Midnight) لمطابقة السيرفر بدقة
+    const now = new Date();
+    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+
     try {
-        const { count: totalCount } = await supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('user_id', userId);
+        // 2. هل هو مستخدم جديد؟
+        const { count: totalCount } = await supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId);
         setIsNewUser(totalCount === 0);
 
-        const { count: todayCount } = await supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', today).eq('role', 'user');
+        // 3. عد رسائل اليوم (باستخدام التوقيت الموحد)
+        const { count: todayCount } = await supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gte('created_at', todayUTC) // 👈 هذا هو الإصلاح الجوهري
+            .eq('role', 'user');
+        
         setMsgCount(todayCount || 0);
 
-        const { data: userData } = await supabase.from('users').select('current_lesson').eq('id', userId).single();
+        // 4. جلب تقدم الدروس (الجزء الذي سألت عنه سابقاً)
+        const { data: userData } = await supabase
+            .from('users')
+            .select('current_lesson')
+            .eq('id', userId)
+            .single();
+            
         if (userData) {
             const savedLesson = userData.current_lesson || 1;
             setMaxLesson(savedLesson);
             setCurrentLesson(savedLesson);
         }
+
     } catch (err) { console.error("Stats fetch error:", err); }
   };
+
 
   const checkSubscription = async (userId) => {
     if (!userId) { setUserTier('free'); return; }
