@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
-import { Zap, MessageCircle, BookOpen, Lock, Star, ChevronRight, Send, Volume2, LogOut } from 'lucide-react';
+import { Zap, MessageCircle, BookOpen, Lock, Star, ChevronRight, Send, Volume2, LogOut, Mic, MicOff } from 'lucide-react';
 import { PrivacyPolicy } from './PrivacyPolicy';
 import { RefundPolicy } from './RefundPolicy';
 
@@ -21,10 +21,11 @@ export default function FlowCraftLang() {
   const [view, setView] = useState('home');
   const [msgCount, setMsgCount] = useState(0);
   
-  // Billing State
+  // 🎤 Voice State
+  const [isListening, setIsListening] = useState(false);
+  
+  // Billing & Auth
   const [billingCycle, setBillingCycle] = useState('monthly');
-
-  // Auth Form States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
@@ -36,23 +37,43 @@ export default function FlowCraftLang() {
   // 2. HELPER FUNCTIONS
   // ==========================================
 
-  // ✅ دالة الدخول الذكية (لفصل العالمين)
-  const enterMode = (selectedMode) => {
-    setMode(selectedMode);
-    setMessages([]); // 🧹 تنظيف الرسائل القديمة فوراً
-
-    // 🎭 إضافة رسالة ترحيبية خاصة بكل مود لإعطاء شعور الاختلاف
-    if (selectedMode === 'chat') {
-        setMessages([{ 
-            role: 'assistant', 
-            content: "Yo! FlowSensei here. 🕶️\n\nI'm ready to chat about anything! What anime are you watching these days?" 
-        }]);
-    } else if (selectedMode === 'lessons') {
-        setMessages([{ 
-            role: 'assistant', 
-            content: `Osu! 🥋\n\nWelcome to **Lesson ${currentLesson}**.\nWe will focus on mastering specific phrases today.\n\nAre you ready to begin?` 
-        }]);
+  // 🎤 دالة الاستماع (Speech to Text)
+  const toggleListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      alert("Browser doesn't support speech recognition. Please use Google Chrome.");
+      return;
     }
+
+    if (isListening) {
+      setIsListening(false);
+      return; // التوقف سيحدث تلقائياً
+    }
+
+    setIsListening(true);
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ja-JP'; // 🇯🇵 الاستماع لليابانية حصراً
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(transcript); // وضع النص المنطوق في الخانة
+      setIsListening(false);
+    };
+
+    recognition.onspeechend = () => {
+      setIsListening(false);
+      recognition.stop();
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech error:", event.error);
+      setIsListening(false);
+    };
+
+    recognition.start();
   };
 
   const fetchUsageStats = async (userId) => {
@@ -75,12 +96,22 @@ export default function FlowCraftLang() {
 
   const checkSubscription = async (userId) => {
     if (!userId) { setUserTier('free'); return; }
-    const { data: userData, error } = await supabase.from('users').select('subscription_status, subscription_tier').eq('id', userId).single();
+    
+    const { data: userData, error } = await supabase
+        .from('users')
+        .select('subscription_status, subscription_tier')
+        .eq('id', userId)
+        .single();
+    
     if (error && error.code !== 'PGRST116') { setUserTier('free'); return; }
+
     if (userData && userData.subscription_status === 'active') {
         setUserTier(userData.subscription_tier || 'premium');
     } else {
-        if (!userData) { try { await supabase.from('users').insert([{ id: userId, subscription_status: 'free' }]).select(); } catch (e) {} }
+        if (!userData) { 
+            try { await supabase.from('users').insert([{ id: userId, subscription_status: 'free' }]).select(); } 
+            catch (e) {} 
+        }
         setUserTier('free');
     }
   };
@@ -88,6 +119,7 @@ export default function FlowCraftLang() {
   const handleAuthSubmit = async (isSignUp) => {
       if (!email || !password) return;
       setLoading(true); setAuthMessage('');
+      
       let result;
       if (isSignUp) {
         result = await supabase.auth.signUp({ email, password });
@@ -110,50 +142,20 @@ export default function FlowCraftLang() {
     setSession(null);
   };
 
-    const speak = (text) => {
+  const speak = (text) => {
     if (!window.speechSynthesis) return;
-    
-    // إيقاف أي كلام سابق
+    const cleanText = text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
     window.speechSynthesis.cancel();
-
-    // 1. التحقق: هل النص يحتوي على رموز يابانية؟
-    const hasJapanese = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/.test(text);
     
-    let utterance;
-    let cleanText = text;
-
-    if (hasJapanese) {
-        // 🎌 حالة اليابانية:
-        // نحذف الحروف الإنجليزية (الروماجي) والأقواس لتجنب التكرار واللكنة السيئة
-        // النتيجة: سيقرأ "Sugoi!" باليابانية فقط ولن يقرأ الترجمة الإنجليزية
-        cleanText = text.replace(/[a-zA-Z]/g, '').replace(/[()]/g, '').trim();
-        
-        utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.lang = 'ja-JP'; // فرض الصوت الياباني
-        
-        // البحث عن أفضل صوت ياباني
-        const voices = window.speechSynthesis.getVoices();
-        const japanVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja"));
-        if (japanVoice) utterance.voice = japanVoice;
-
-    } else {
-        // 🇺🇸 حالة الإنجليزية فقط (للشروحات):
-        // نستخدم صوتاً إنجليزياً ليكون النطق سليماً
-        utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'en-US';
-        
-        const voices = window.speechSynthesis.getVoices();
-        const engVoice = voices.find(v => v.lang.includes('en'));
-        if (engVoice) utterance.voice = engVoice;
-    }
-
-    // إعدادات السرعة
-    utterance.rate = 1.0; 
-    utterance.pitch = 1.1; 
-
+    const voices = window.speechSynthesis.getVoices();
+    const japanVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || 
+                       voices.find(v => v.lang === 'ja-JP');
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    if (japanVoice) { utterance.voice = japanVoice; utterance.lang = 'ja-JP'; } else { utterance.lang = 'ja-JP'; }
+    utterance.rate = 1.0; utterance.pitch = 1.1;
     window.speechSynthesis.speak(utterance);
   };
-
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -313,7 +315,7 @@ export default function FlowCraftLang() {
             </div>
           </div>
           
-          <footer className="mt-20 flex gap-8">
+          <footer className="mt-20 mb-10 flex gap-8">
             <button onClick={() => setView('privacy')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Privacy Protocol</button>
             <button onClick={() => setView('refund')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Refund Rules</button>
           </footer>
@@ -338,6 +340,7 @@ export default function FlowCraftLang() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-anime-primary to-anime-accent ml-2">{userName}</span>-san!
         </h1>
         
+        {/* TOGGLE */}
         <div className="relative flex items-center bg-gray-900/80 backdrop-blur border border-white/10 rounded-full p-1 mb-10 w-64 h-12 shadow-2xl cursor-pointer">
             <div className={`absolute left-1 top-1 bottom-1 w-[calc(50%-4px)] bg-gradient-to-r from-anime-accent to-purple-600 rounded-full transition-all duration-300 ease-in-out shadow-[0_0_15px_#f472b6] ${billingCycle === 'yearly' ? 'translate-x-full' : 'translate-x-0'}`}></div>
             <button onClick={() => setBillingCycle('monthly')} className="w-1/2 relative z-10 font-bold text-sm transition-colors duration-300 text-center">Monthly</button>
@@ -346,6 +349,7 @@ export default function FlowCraftLang() {
             </button>
         </div>
 
+        {/* PAYWALL BANNER */}
         {isFree && (
             <div className={`mb-8 p-6 rounded-2xl max-w-4xl w-full flex flex-col md:flex-row justify-between items-center shadow-lg border-2 gap-4 text-center md:text-left transition-all duration-500 ${msgCount >= 3 ? "bg-red-900/20 border-red-500/50 shadow-red-500/20" : "bg-emerald-900/20 border-emerald-500/50 shadow-emerald-500/20"}`}>
                 <div>
@@ -363,18 +367,18 @@ export default function FlowCraftLang() {
         )}
 
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
+          {/* Chat Card */}
           <button 
-            onClick={() => hasChatAccess ? enterMode('chat') : null} 
-            disabled={!hasChatAccess} 
-            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${hasChatAccess ? 'bg-[#1e293b]/50 border-2 border-anime-primary/50 hover:border-anime-primary hover:shadow-[0_0_30px_rgba(56,189,248,0.3)] cursor-pointer' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80 cursor-not-allowed'}`}
+            onClick={() => hasChatAccess ? setMode('chat') : null}
+            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${hasChatAccess ? 'bg-[#1e293b]/50 border-2 border-anime-primary/50 hover:border-anime-primary hover:shadow-[0_0_30px_rgba(56,189,248,0.3)]' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80'}`}
           >
              <div className="absolute inset-0 bg-gradient-to-br from-anime-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"/>
              <MessageCircle size={48} className="text-anime-primary mb-4" />
              <h2 className="text-3xl font-manga mb-2 text-white">Free Chat</h2>
              <p className="text-gray-400">Roleplay with AI Sensei. Talk about Anime, Manga, and Life.</p>
-             {isFree && (
+             {!hasChatAccess && (
                 <div className="absolute top-6 right-6 flex flex-col items-end gap-3">
-                    <Lock className={`drop-shadow-lg ${msgCount >= 3 ? "text-red-500" : "text-gray-500"}`} size={28} />
+                    <Lock className="text-red-500 drop-shadow-lg" size={28} />
                     <div onClick={(e) => { e.stopPropagation(); handleCryptoUpgrade('chat'); }} className="bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 text-xs font-bold text-white px-4 py-2 rounded-lg cursor-pointer transition">
                         Unlock ({billingCycle === 'monthly' ? '$10' : '$84'})
                     </div>
@@ -382,18 +386,18 @@ export default function FlowCraftLang() {
              )} 
           </button>
 
+          {/* Lessons Card */}
           <button 
-            onClick={() => hasLessonsAccess ? enterMode('lessons') : null}
-            disabled={!hasLessonsAccess}
-            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${hasLessonsAccess ? 'bg-[#1e293b]/50 border-2 border-anime-accent/50 hover:border-anime-accent hover:shadow-[0_0_30px_rgba(244,114,182,0.3)] cursor-pointer' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80 cursor-not-allowed'}`}
+            onClick={() => hasLessonsAccess ? setMode('lessons') : null}
+            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${hasLessonsAccess ? 'bg-[#1e293b]/50 border-2 border-anime-accent/50 hover:border-anime-accent hover:shadow-[0_0_30px_rgba(244,114,182,0.3)]' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80'}`}
           >
              <div className="absolute inset-0 bg-gradient-to-br from-anime-accent/10 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"/>
              <BookOpen size={48} className="text-anime-accent mb-4" />
              <h2 className="text-3xl font-manga mb-2 text-white">The Path</h2>
              <p className="text-gray-400">Structured Ninja curriculum. From Genin basics to Kage fluency.</p>
-             {isFree && (
+             {!hasLessonsAccess && (
                 <div className="absolute top-6 right-6 flex flex-col items-end gap-3">
-                    <Lock className={`drop-shadow-lg ${msgCount >= 3 ? "text-red-500" : "text-gray-500"}`} size={28} />
+                    <Lock className="text-red-500 drop-shadow-lg" size={28} />
                     <div onClick={(e) => { e.stopPropagation(); handleCryptoUpgrade('lessons'); }} className="bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 text-xs font-bold text-white px-4 py-2 rounded-lg cursor-pointer transition">
                         Unlock ({billingCycle === 'monthly' ? '$10' : '$84'})
                     </div>
@@ -429,7 +433,7 @@ export default function FlowCraftLang() {
         <div className="h-20 border-b border-white/5 hidden md:flex items-center px-8 justify-between bg-[#050505]/50 backdrop-blur z-10">
           <div className="flex items-center gap-4">
               <h2 className="font-bold text-xl">{mode === 'chat' ? '💬 Free Chat' : `⚔️ Lesson ${currentLesson}`}</h2>
-              
+              {/* ✅ NAVIGATION BUTTONS */}
               {mode === 'lessons' && (
                   <div className="flex gap-2 ml-4">
                       <button onClick={() => { setMessages([]); setCurrentLesson(prev => Math.max(1, prev - 1)); }} disabled={currentLesson === 1} className="p-2 bg-white/10 rounded hover:bg-white/20 disabled:opacity-30 transition">← Prev</button>
