@@ -190,7 +190,7 @@ export default function FlowCraftLang() {
       let errorMessage = err.message || "Unknown Error";
       if (errorMessage.includes("LIMIT_EXCEEDED")) {
           alert("LIMIT EXCEEDED: Your 3 free messages are done for today! Upgrade to Premium to continue your training. ⚔️");
-          setMsgCount(3);
+          setMsgCount(10);
       } else if (errorMessage.includes("Server Error") || errorMessage.includes("Groq API Error")) {
           alert("SYSTEM ERROR: AI service unavailable. Try again later.");
       } else { alert("Error: " + errorMessage); }
@@ -308,10 +308,10 @@ export default function FlowCraftLang() {
   // DASHBOARD
   if (!mode) {
     const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Shinobi";
-    const messagesLeft = Math.max(0, 3 - msgCount);
+    const messagesLeft = Math.max(0, 10 - msgCount);
     
     const isFree = userTier === 'free';
-    const limitReached = isFree && msgCount >= 3;
+    const limitReached = isFree && msgCount >= 10;
     const canEnterChat = (userTier === 'premium' || userTier === 'chat') || (isFree && !limitReached);
     const canEnterLessons = (userTier === 'premium' || userTier === 'lessons') || (isFree && !limitReached);
 
