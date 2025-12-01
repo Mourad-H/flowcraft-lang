@@ -117,7 +117,7 @@ export default function FlowCraftLang() {
     } finally { setLoading(false); }
   };
 
-  // ✅ Updated Payment Logic with Cycle
+  // ✅ Updated Payment Logic with Cycle & Specific Pricing
   const handleCryptoUpgrade = async (tier) => {
     if (!session?.user?.id) { alert("Please log in first."); return; }
     
@@ -173,7 +173,10 @@ export default function FlowCraftLang() {
   // 4. RENDERING (Cyberpunk Style 🎨)
   // ==========================================
 
+  // LOADING
   if (authLoading) return <div className="min-h-screen bg-black flex items-center justify-center text-white"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-anime-accent shadow-[0_0_20px_#f472b6]"></div></div>;
+  
+  // LEGAL PAGES (With Neon Glows)
   if (view === 'privacy') return <PrivacyPolicy setView={setView} />;
   if (view === 'refund') return <RefundPolicy setView={setView} />;
 
@@ -213,9 +216,11 @@ export default function FlowCraftLang() {
               {authMessage && <p className="text-anime-accent text-sm mt-2 font-bold bg-anime-accent/10 p-2 rounded">{authMessage}</p>}
             </div>
           </div>
-          <footer className="mt-20 text-gray-500 text-sm flex gap-6">
-            <button onClick={() => setView('privacy')} className="hover:text-anime-primary transition">Privacy Protocol</button>
-            <button onClick={() => setView('refund')} className="hover:text-anime-primary transition">Refund Rules</button>
+          
+          {/* Footer with Neon Effect */}
+          <footer className="mt-20 flex gap-8">
+            <button onClick={() => setView('privacy')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Privacy Protocol</button>
+            <button onClick={() => setView('refund')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Refund Rules</button>
           </footer>
         </div>
       </div>
@@ -266,7 +271,7 @@ export default function FlowCraftLang() {
         )}
 
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
-          {/* Chat Mode Card */}
+          {/* Chat Card */}
           <button 
             onClick={() => hasChatAccess ? setMode('chat') : null}
             className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${hasChatAccess ? 'bg-[#1e293b]/50 border-2 border-anime-primary/50 hover:border-anime-primary hover:shadow-[0_0_30px_rgba(56,189,248,0.3)]' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80'}`}
@@ -285,7 +290,7 @@ export default function FlowCraftLang() {
              )} 
           </button>
 
-          {/* Lessons Mode Card */}
+          {/* Lessons Card */}
           <button 
             onClick={() => hasLessonsAccess ? setMode('lessons') : null}
             className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${hasLessonsAccess ? 'bg-[#1e293b]/50 border-2 border-anime-accent/50 hover:border-anime-accent hover:shadow-[0_0_30px_rgba(244,114,182,0.3)]' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80'}`}
@@ -305,6 +310,7 @@ export default function FlowCraftLang() {
           </button>
         </div>
         
+        {/* Logout & Footer with Neon Glow */}
         <button onClick={handleLogout} className="mt-12 text-neon-red text-sm flex gap-2 items-center font-bold tracking-wide transition"><LogOut size={18} className="drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]"/> ABORT MISSION (LOG OUT)</button>
         <footer className="mt-10 mb-6 flex gap-8">
             <button onClick={() => setView('privacy')} className="text-neon-white text-xs font-bold tracking-widest uppercase">Privacy Protocol</button>
@@ -318,7 +324,6 @@ export default function FlowCraftLang() {
   // E. CHAT INTERFACE
   return (
     <div className="flex h-screen bg-[#050505] text-white font-sans overflow-hidden">
-      {/* ... (Chat Interface remains standard for performance) ... */}
       <div className="md:hidden fixed top-0 w-full bg-[#050505]/90 backdrop-blur border-b border-white/10 p-4 flex justify-between items-center z-50">
         <div className="font-manga text-xl text-anime-primary tracking-widest">FlowCraft</div>
         <button onClick={() => setMode(null)} className="text-xs bg-white/10 px-3 py-1 rounded">Menu</button>
