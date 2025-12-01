@@ -16,7 +16,7 @@ export default function FlowCraftLang() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentLesson, setCurrentLesson] = useState(1);
-  const [maxLesson, setMaxLesson] = useState(1); // ✅ Added maxLesson state
+  const [maxLesson, setMaxLesson] = useState(1); // ✅ Track progress
   const [isNewUser, setIsNewUser] = useState(false);
   const [view, setView] = useState('home');
   const [msgCount, setMsgCount] = useState(0);
@@ -39,43 +39,32 @@ export default function FlowCraftLang() {
   const fetchUsageStats = async (userId) => {
     const today = new Date().toISOString().split('T')[0];
     try {
-        // 1. Check if New User
+        // 1. New User Check
         const { count: totalCount } = await supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('user_id', userId);
         setIsNewUser(totalCount === 0);
 
-        // 2. Check Daily Limit
+        // 2. Daily Limit Check
         const { count: todayCount } = await supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', today).eq('role', 'user');
         setMsgCount(todayCount || 0);
 
-        // ✅ 3. Load Lesson Progress (The Missing Part Added Here)
+        // 3. Progress Check (Curriculum)
         const { data: userData } = await supabase.from('users').select('current_lesson').eq('id', userId).single();
         if (userData) {
             const savedLesson = userData.current_lesson || 1;
             setMaxLesson(savedLesson);
             setCurrentLesson(savedLesson);
         }
-
     } catch (err) { console.error("Stats fetch error:", err); }
   };
 
   const checkSubscription = async (userId) => {
     if (!userId) { setUserTier('free'); return; }
-    
-    const { data: userData, error } = await supabase
-        .from('users')
-        .select('subscription_status, subscription_tier')
-        .eq('id', userId)
-        .single();
-    
+    const { data: userData, error } = await supabase.from('users').select('subscription_status, subscription_tier').eq('id', userId).single();
     if (error && error.code !== 'PGRST116') { setUserTier('free'); return; }
-
     if (userData && userData.subscription_status === 'active') {
         setUserTier(userData.subscription_tier || 'premium');
     } else {
-        if (!userData) { 
-            try { await supabase.from('users').insert([{ id: userId, subscription_status: 'free' }]).select(); } 
-            catch (e) {} 
-        }
+        if (!userData) { try { await supabase.from('users').insert([{ id: userId, subscription_status: 'free' }]).select(); } catch (e) {} }
         setUserTier('free');
     }
   };
@@ -83,7 +72,6 @@ export default function FlowCraftLang() {
   const handleAuthSubmit = async (isSignUp) => {
       if (!email || !password) return;
       setLoading(true); setAuthMessage('');
-      
       let result;
       if (isSignUp) {
         result = await supabase.auth.signUp({ email, password });
@@ -146,15 +134,15 @@ export default function FlowCraftLang() {
 
       const aiMsgContent = data.message || "Error: No response";
       
+      // Handle Lesson Completion / Exam Pass
       if (aiMsgContent.includes("LESSON_COMPLETE") || aiMsgContent.includes("[EXAM_PASSED]")) {
          const cleanMsg = aiMsgContent.replace(/\[.*?\]/g, ""); 
          setMessages(prev => [...prev, { role: 'assistant', content: cleanMsg + "\n\n✨ Progress Saved! Press 'Next' to continue." }]);
          
-         // ✅ Unlock Next Lesson Logic
+         // Unlock next lesson Logic
          if (currentLesson === maxLesson) {
              const nextLesson = maxLesson + 1;
              setMaxLesson(nextLesson);
-             // Save to DB
              await supabase.from('users').update({ current_lesson: nextLesson }).eq('id', session.user.id);
          }
          speak(cleanMsg);
@@ -280,10 +268,9 @@ export default function FlowCraftLang() {
               {authMessage && <p className="text-anime-accent text-sm mt-2 font-bold bg-anime-accent/10 p-2 rounded">{authMessage}</p>}
             </div>
           </div>
-          
-          <footer className="mt-20 mb-10 flex gap-8">
-            <button onClick={() => setView('privacy')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Privacy Protocol</button>
-            <button onClick={() => setView('refund')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Refund Rules</button>
+          <footer className="mt-20 text-gray-500 text-sm flex gap-6">
+            <button onClick={() => setView('privacy')} className="hover:text-anime-primary transition">Privacy Protocol</button>
+            <button onClick={() => setView('refund')} className="hover:text-anime-primary transition">Refund Rules</button>
           </footer>
         </div>
       </div>
@@ -295,7 +282,6 @@ export default function FlowCraftLang() {
     const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Shinobi";
     const messagesLeft = Math.max(0, 3 - msgCount);
     
-    // Check specific access
     const hasChatAccess = userTier === 'premium' || userTier === 'chat';
     const hasLessonsAccess = userTier === 'premium' || userTier === 'lessons';
     const isFree = userTier === 'free';
@@ -401,7 +387,7 @@ export default function FlowCraftLang() {
           <div className="flex items-center gap-4">
               <h2 className="font-bold text-xl">{mode === 'chat' ? '💬 Free Chat' : `⚔️ Lesson ${currentLesson}`}</h2>
               
-              {/* ✅ NAVIGATION BUTTONS (For Lessons Only) */}
+              {/* NAVIGATION BUTTONS (Lessons Only) */}
               {mode === 'lessons' && (
                   <div className="flex gap-2 ml-4">
                       <button 
@@ -420,7 +406,7 @@ export default function FlowCraftLang() {
                             setMessages([]); 
                             setCurrentLesson(prev => prev + 1);
                         }}
-                        // Disable Next if they haven't unlocked it
+                        // Lock Next if not completed
                         disabled={currentLesson >= maxLesson}
                         className="p-2 bg-anime-primary text-black rounded font-bold hover:bg-cyan-400 disabled:opacity-30 disabled:bg-gray-600 disabled:text-gray-400 transition"
                       >
