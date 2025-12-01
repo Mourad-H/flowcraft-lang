@@ -16,12 +16,13 @@ export default function FlowCraftLang() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentLesson, setCurrentLesson] = useState(1);
+  const [maxLesson, setMaxLesson] = useState(1); // ✅ Added maxLesson state
   const [isNewUser, setIsNewUser] = useState(false);
   const [view, setView] = useState('home');
   const [msgCount, setMsgCount] = useState(0);
   
-  // 💰 Billing State (New)
-  const [billingCycle, setBillingCycle] = useState('monthly'); // 'monthly' or 'yearly'
+  // 💰 Billing State
+  const [billingCycle, setBillingCycle] = useState('monthly');
 
   // Auth Form States
   const [email, setEmail] = useState('');
@@ -38,21 +39,43 @@ export default function FlowCraftLang() {
   const fetchUsageStats = async (userId) => {
     const today = new Date().toISOString().split('T')[0];
     try {
+        // 1. Check if New User
         const { count: totalCount } = await supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('user_id', userId);
         setIsNewUser(totalCount === 0);
+
+        // 2. Check Daily Limit
         const { count: todayCount } = await supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', today).eq('role', 'user');
         setMsgCount(todayCount || 0);
+
+        // ✅ 3. Load Lesson Progress (The Missing Part Added Here)
+        const { data: userData } = await supabase.from('users').select('current_lesson').eq('id', userId).single();
+        if (userData) {
+            const savedLesson = userData.current_lesson || 1;
+            setMaxLesson(savedLesson);
+            setCurrentLesson(savedLesson);
+        }
+
     } catch (err) { console.error("Stats fetch error:", err); }
   };
 
   const checkSubscription = async (userId) => {
     if (!userId) { setUserTier('free'); return; }
-    const { data: userData, error } = await supabase.from('users').select('subscription_status, subscription_tier').eq('id', userId).single();
+    
+    const { data: userData, error } = await supabase
+        .from('users')
+        .select('subscription_status, subscription_tier')
+        .eq('id', userId)
+        .single();
+    
     if (error && error.code !== 'PGRST116') { setUserTier('free'); return; }
+
     if (userData && userData.subscription_status === 'active') {
         setUserTier(userData.subscription_tier || 'premium');
     } else {
-        if (!userData) { try { await supabase.from('users').insert([{ id: userId, subscription_status: 'free' }]).select(); } catch (e) {} }
+        if (!userData) { 
+            try { await supabase.from('users').insert([{ id: userId, subscription_status: 'free' }]).select(); } 
+            catch (e) {} 
+        }
         setUserTier('free');
     }
   };
@@ -60,23 +83,38 @@ export default function FlowCraftLang() {
   const handleAuthSubmit = async (isSignUp) => {
       if (!email || !password) return;
       setLoading(true); setAuthMessage('');
-      let result;
-      if (isSignUp) result = await supabase.auth.signUp({ email, password });
-      else result = await supabase.auth.signInWithPassword({ email, password });
       
-      if (result.error) setAuthMessage(result.error.message);
-      else if (isSignUp) setAuthMessage("Signup successful! Please check your email for confirmation.");
+      let result;
+      if (isSignUp) {
+        result = await supabase.auth.signUp({ email, password });
+      } else {
+        result = await supabase.auth.signInWithPassword({ email, password });
+      }
+
+      if (result.error) {
+          setAuthMessage(result.error.message);
+      } else if (isSignUp) {
+        setAuthMessage("Signup successful! Please check your email for confirmation.");
+      }
       setLoading(false);
   };
   
-  const handleLogout = async () => { await supabase.auth.signOut(); setMode(null); setMessages([]); setSession(null); };
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setMode(null);
+    setMessages([]);
+    setSession(null);
+  };
 
   const speak = (text) => {
     if (!window.speechSynthesis) return;
     const cleanText = text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
     window.speechSynthesis.cancel();
+    
     const voices = window.speechSynthesis.getVoices();
-    const japanVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || voices.find(v => v.lang === 'ja-JP');
+    const japanVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || 
+                       voices.find(v => v.lang === 'ja-JP');
+    
     const utterance = new SpeechSynthesisUtterance(cleanText);
     if (japanVoice) { utterance.voice = japanVoice; utterance.lang = 'ja-JP'; } else { utterance.lang = 'ja-JP'; }
     utterance.rate = 1.0; utterance.pitch = 1.1;
@@ -88,20 +126,37 @@ export default function FlowCraftLang() {
     const userMsg = { role: 'user', content: input };
     setMessages(prev => [...prev, userMsg]);
     setInput(''); setLoading(true);
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...messages, userMsg], mode: mode, lessonId: currentLesson, userId: session?.user?.id })
+        body: JSON.stringify({
+          messages: [...messages, userMsg],
+          mode: mode,
+          lessonId: currentLesson,
+          userId: session?.user?.id
+        })
       });
+
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || "Server Error");
+
       setMsgCount(prev => prev + 1);
+
       const aiMsgContent = data.message || "Error: No response";
-      if (aiMsgContent.includes("LESSON_COMPLETE")) {
-         const cleanMsg = aiMsgContent.replace("LESSON_COMPLETE", "");
-         setMessages(prev => [...prev, { role: 'assistant', content: cleanMsg + "\n\n🎉 Level Up!" }]);
-         setCurrentLesson(prev => currentLesson + 1);
+      
+      if (aiMsgContent.includes("LESSON_COMPLETE") || aiMsgContent.includes("[EXAM_PASSED]")) {
+         const cleanMsg = aiMsgContent.replace(/\[.*?\]/g, ""); 
+         setMessages(prev => [...prev, { role: 'assistant', content: cleanMsg + "\n\n✨ Progress Saved! Press 'Next' to continue." }]);
+         
+         // ✅ Unlock Next Lesson Logic
+         if (currentLesson === maxLesson) {
+             const nextLesson = maxLesson + 1;
+             setMaxLesson(nextLesson);
+             // Save to DB
+             await supabase.from('users').update({ current_lesson: nextLesson }).eq('id', session.user.id);
+         }
          speak(cleanMsg);
       } else {
          setMessages(prev => [...prev, { role: 'assistant', content: aiMsgContent }]);
@@ -117,11 +172,9 @@ export default function FlowCraftLang() {
     } finally { setLoading(false); }
   };
 
-  // ✅ Updated Payment Logic with Cycle & Specific Pricing
   const handleCryptoUpgrade = async (tier) => {
     if (!session?.user?.id) { alert("Please log in first."); return; }
     
-    // Calculate display price for confirmation
     let priceDisplay = "";
     if (billingCycle === 'yearly') {
         priceDisplay = tier === 'premium' ? "$140 (Yearly)" : "$84 (Yearly)";
@@ -158,25 +211,36 @@ export default function FlowCraftLang() {
     const handleAuthCheck = async (currentSession) => {
       try {
         if (currentSession?.user) {
-          await Promise.all([ checkSubscription(currentSession.user.id), fetchUsageStats(currentSession.user.id) ]);
+          await Promise.all([
+             checkSubscription(currentSession.user.id),
+             fetchUsageStats(currentSession.user.id)
+          ]);
         }
       } catch (err) { console.error("Auth Check Error:", err); } finally { setAuthLoading(false); }
     };
-    supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); if (session) handleAuthCheck(session); else setAuthLoading(false); });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => { setSession(session); if (session) handleAuthCheck(session); else setAuthLoading(false); });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) handleAuthCheck(session);
+      else setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) handleAuthCheck(session);
+      else setAuthLoading(false);
+    });
+
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   // ==========================================
-  // 4. RENDERING (Cyberpunk Style 🎨)
+  // 4. RENDERING
   // ==========================================
 
-  // LOADING
   if (authLoading) return <div className="min-h-screen bg-black flex items-center justify-center text-white"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-anime-accent shadow-[0_0_20px_#f472b6]"></div></div>;
-  
-  // LEGAL PAGES (With Neon Glows)
   if (view === 'privacy') return <PrivacyPolicy setView={setView} />;
   if (view === 'refund') return <RefundPolicy setView={setView} />;
 
@@ -217,8 +281,7 @@ export default function FlowCraftLang() {
             </div>
           </div>
           
-          {/* Footer with Neon Effect */}
-          <footer className="mt-20 flex gap-8">
+          <footer className="mt-20 mb-10 flex gap-8">
             <button onClick={() => setView('privacy')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Privacy Protocol</button>
             <button onClick={() => setView('refund')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Refund Rules</button>
           </footer>
@@ -244,7 +307,7 @@ export default function FlowCraftLang() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-anime-primary to-anime-accent ml-2">{userName}</span>-san!
         </h1>
         
-        {/* 🔥 THE SMOOTH SLIDING TOGGLE 🔥 */}
+        {/* TOGGLE */}
         <div className="relative flex items-center bg-gray-900/80 backdrop-blur border border-white/10 rounded-full p-1 mb-10 w-64 h-12 shadow-2xl cursor-pointer">
             <div className={`absolute left-1 top-1 bottom-1 w-[calc(50%-4px)] bg-gradient-to-r from-anime-accent to-purple-600 rounded-full transition-all duration-300 ease-in-out shadow-[0_0_15px_#f472b6] ${billingCycle === 'yearly' ? 'translate-x-full' : 'translate-x-0'}`}></div>
             <button onClick={() => setBillingCycle('monthly')} className="w-1/2 relative z-10 font-bold text-sm transition-colors duration-300 text-center">Monthly</button>
@@ -253,7 +316,7 @@ export default function FlowCraftLang() {
             </button>
         </div>
 
-        {/* PAYWALL BANNER */}
+        {/* BANNER */}
         {isFree && (
             <div className={`mb-8 p-6 rounded-2xl max-w-4xl w-full flex flex-col md:flex-row justify-between items-center shadow-lg border-2 gap-4 text-center md:text-left transition-all duration-500 ${msgCount >= 3 ? "bg-red-900/20 border-red-500/50 shadow-red-500/20" : "bg-emerald-900/20 border-emerald-500/50 shadow-emerald-500/20"}`}>
                 <div>
@@ -310,7 +373,6 @@ export default function FlowCraftLang() {
           </button>
         </div>
         
-        {/* Logout & Footer with Neon Glow */}
         <button onClick={handleLogout} className="mt-12 text-neon-red text-sm flex gap-2 items-center font-bold tracking-wide transition"><LogOut size={18} className="drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]"/> ABORT MISSION (LOG OUT)</button>
         <footer className="mt-10 mb-6 flex gap-8">
             <button onClick={() => setView('privacy')} className="text-neon-white text-xs font-bold tracking-widest uppercase">Privacy Protocol</button>
@@ -336,7 +398,37 @@ export default function FlowCraftLang() {
       </div>
       <div className="flex-1 flex flex-col relative pt-16 md:pt-0">
         <div className="h-20 border-b border-white/5 hidden md:flex items-center px-8 justify-between bg-[#050505]/50 backdrop-blur z-10">
-          <h2 className="font-bold text-xl">{mode === 'chat' ? '💬 Free Chat Mode' : `⚔️ Training Level ${currentLesson}`}</h2>
+          <div className="flex items-center gap-4">
+              <h2 className="font-bold text-xl">{mode === 'chat' ? '💬 Free Chat' : `⚔️ Lesson ${currentLesson}`}</h2>
+              
+              {/* ✅ NAVIGATION BUTTONS (For Lessons Only) */}
+              {mode === 'lessons' && (
+                  <div className="flex gap-2 ml-4">
+                      <button 
+                        onClick={() => {
+                            setMessages([]); 
+                            setCurrentLesson(prev => Math.max(1, prev - 1));
+                        }}
+                        disabled={currentLesson === 1}
+                        className="p-2 bg-white/10 rounded hover:bg-white/20 disabled:opacity-30 transition"
+                      >
+                        ← Prev
+                      </button>
+                      
+                      <button 
+                        onClick={() => {
+                            setMessages([]); 
+                            setCurrentLesson(prev => prev + 1);
+                        }}
+                        // Disable Next if they haven't unlocked it
+                        disabled={currentLesson >= maxLesson}
+                        className="p-2 bg-anime-primary text-black rounded font-bold hover:bg-cyan-400 disabled:opacity-30 disabled:bg-gray-600 disabled:text-gray-400 transition"
+                      >
+                        Next →
+                      </button>
+                  </div>
+              )}
+          </div>
           {userTier !== 'premium' && <button onClick={() => handleCryptoUpgrade('premium')} className="text-xs bg-anime-warning text-black px-4 py-2 rounded-lg font-bold hover:shadow-[0_0_15px_#facc15] transition">UPGRADE ALL</button>}
         </div>
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
