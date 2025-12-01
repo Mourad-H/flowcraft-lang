@@ -38,6 +38,7 @@ export default async function handler(req, res) {
     if (!userId) return res.status(401).json({ error: "USER_ID_MISSING" });
 
     // --- 3. SUBSCRIPTION & LIMIT LOGIC ---
+    // 1. Fetch User Data
     const { data: user, error: userError } = await supabase
         .from('users')
         .select('subscription_status, subscription_ends_at')
@@ -46,7 +47,7 @@ export default async function handler(req, res) {
     
     if (userError) console.error("User fetch error:", userError);
 
-    // Check Expiration
+    // 2. Check Expiration
     if (user && user.subscription_ends_at && new Date(user.subscription_ends_at) < new Date()) {
         await supabase.from('users').update({ subscription_status: 'expired' }).eq('id', userId);
         return res.status(403).json({ error: "SUBSCRIPTION_EXPIRED" }); 
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
     
     const subscriptionStatus = user?.subscription_status || 'free'; 
 
-    // Check Daily Limit (For Free Users)
+    // 3. Check Daily Limit (For Free Users Only)
     if (subscriptionStatus !== 'active') {
         const DAILY_LIMIT = 3; 
         const today = new Date().toISOString().split('T')[0]; 
@@ -73,7 +74,7 @@ export default async function handler(req, res) {
         }
     }
 
-    // ✅ LOGGING: Save User Message (Crucial for the counter)
+    // ✅ LOGGING: Save User Message
     const lastMessage = messages[messages.length - 1];
     if (lastMessage && lastMessage.role === 'user') {
         await supabase.from('conversations').insert({
