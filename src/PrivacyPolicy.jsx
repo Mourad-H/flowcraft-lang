@@ -1,36 +1,72 @@
-// src/PrivacyPolicy.jsx
 import React from 'react';
+import { ChevronLeft, Lock, Server, Eye } from 'lucide-react';
 
 export const PrivacyPolicy = ({ setView }) => (
-  <div className="min-h-screen bg-anime-bg text-white p-10 font-sans max-w-4xl mx-auto">
-    <button 
-      onClick={() => setView('home')} 
-      className="text-anime-accent hover:text-white transition mb-8 flex items-center gap-2"
-    >
-      ← Back to App
-    </button>
-    <h1 className="text-4xl font-bold text-anime-primary mb-6">Privacy Policy</h1>
-    <p className="text-sm text-gray-500 mb-8">Last Updated: November 28, 2025</p>
+  <div className="min-h-screen bg-[#050505] anime-grid-bg text-white p-6 font-sans relative overflow-hidden">
+    <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none"></div>
 
-    <h2 className="text-2xl font-bold mb-3">1. Data We Collect</h2>
-    <p className="text-gray-300">
-      We only collect the minimum data necessary for authentication and service delivery:
-    </p>
-    <ul className="list-disc ml-8 text-gray-300 space-y-2">
-      <li><strong>Authentication Data:</strong> Your email address and a secure User ID (via Google Sign-In and Supabase).</li>
-      <li><strong>Usage Data:</strong> Timestamps and message content (stored temporarily for conversation context and analysis).</li>
-    </ul>
+    <div className="max-w-4xl mx-auto relative z-10">
+      <button 
+        onClick={() => setView('home')} 
+        className="group flex items-center gap-2 text-gray-400 hover:text-white transition mb-8 font-bold"
+      >
+        <ChevronLeft className="group-hover:-translate-x-1 transition" size={20}/> Back to Dojo
+      </button>
 
-    <h2 className="text-2xl font-bold mt-6 mb-3">2. Third-Party Data Sharing</h2>
-    <ul className="list-disc ml-8 text-gray-300 space-y-2">
-      <li><strong>AI Processing:</strong> Your messages are sent to the Groq API solely to generate the educational response. They are not used to train our models.</li>
-      <li><strong>Data Storage:</strong> All user and conversation data is securely hosted on Supabase servers.</li>
-      <li><strong>Payment:</strong> All payment details (credit cards) are handled by Paddle and are never stored on our servers.</li>
-    </ul>
+      <div className="bg-[#1e293b]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 md:p-12 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+        <h1 className="text-5xl md:text-6xl font-manga mb-2 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">
+          Privacy Protocol
+        </h1>
+        <p className="text-gray-400 mb-10 font-mono text-sm border-b border-white/10 pb-6">
+          Security Clearance: Level 1 | Updated: Dec 2025
+        </p>
 
-    <h2 className="text-2xl font-bold mt-6 mb-3">3. Data Retention</h2>
-    <p className="text-gray-300">
-      We retain conversation history to maintain context for your tutor. You may request deletion of your account and associated data by emailing us.
-    </p>
+        <div className="grid md:grid-cols-3 gap-6 mb-10">
+            <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-center">
+                <Lock className="mx-auto text-emerald-400 mb-2" size={24}/>
+                <h3 className="font-bold mb-1">Encrypted</h3>
+                <p className="text-xs text-gray-400">Data via SSL</p>
+            </div>
+            <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-center">
+                <Server className="mx-auto text-emerald-400 mb-2" size={24}/>
+                <h3 className="font-bold mb-1">Secure DB</h3>
+                <p className="text-xs text-gray-400">Hosted on Supabase</p>
+            </div>
+            <div className="bg-black/20 p-4 rounded-xl border border-white/5 text-center">
+                <Eye className="mx-auto text-emerald-400 mb-2" size={24}/>
+                <h3 className="font-bold mb-1">No Selling</h3>
+                <p className="text-xs text-gray-400">We don't sell data</p>
+            </div>
+        </div>
+
+        <div className="space-y-8 text-gray-300 leading-relaxed">
+          <section>
+            <h2 className="text-xl font-bold text-white mb-2">1. Data We Collect</h2>
+            <p>
+              We act as a minimalist data collector. We only store what is strictly necessary for your training progress:
+            </p>
+            <ul className="list-disc ml-6 mt-2 space-y-1 text-gray-400">
+                <li>Authentication ID (via Supabase Auth)</li>
+                <li>Email Address (for login & essential updates)</li>
+                <li>Chat History (to maintain context with AI Sensei)</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-white mb-2">2. Third-Party Intelligence</h2>
+            <p>
+              Your messages are processed by **Groq AI** solely to generate responses. We do not use your personal conversations to train public AI models. Payments are handled securely by **Paddle/NowPayments**; we never touch your credit card numbers.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-white mb-2">3. Data Deletion (The Ninja Vanish)</h2>
+            <p>
+              You have the right to disappear. If you wish to delete your account and all associated data, please contact support. We will wipe your records from our database permanently.
+            </p>
+          </section>
+        </div>
+      </div>
+    </div>
   </div>
 );
