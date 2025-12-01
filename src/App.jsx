@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
-import { Zap, MessageCircle, BookOpen, Lock, Star, ChevronRight, Send, Volume2, LogOut, Sparkles } from 'lucide-react';
+import { Zap, MessageCircle, BookOpen, Lock, Star, ChevronRight, Send, Volume2, LogOut } from 'lucide-react';
 import { PrivacyPolicy } from './PrivacyPolicy';
 import { RefundPolicy } from './RefundPolicy';
 
 export default function FlowCraftLang() {
-  // ... (نفس الـ States السابقة تماماً) ...
+  // ==========================================
+  // 1. ALL STATES
+  // ==========================================
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [userTier, setUserTier] = useState('free');
@@ -17,9 +19,11 @@ export default function FlowCraftLang() {
   const [isNewUser, setIsNewUser] = useState(false);
   const [view, setView] = useState('home');
   const [msgCount, setMsgCount] = useState(0);
-  const [billingCycle, setBillingCycle] = useState('monthly');
   
-  // Auth Form
+  // 💰 Billing State (New)
+  const [billingCycle, setBillingCycle] = useState('monthly'); // 'monthly' or 'yearly'
+
+  // Auth Form States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
@@ -27,9 +31,9 @@ export default function FlowCraftLang() {
   
   const scrollRef = useRef(null);
 
-  // ... (نفس الدوال السابقة: fetchUsageStats, checkSubscription, handleAuthSubmit, handleLogout, speak, handleSend, handleCryptoUpgrade) ...
-  // (للاختصار، أنا أفترض أنك ستنسخ الدوال السابقة كما هي هنا، أو أعد نسخها من الرد السابق إذا احتجت.
-  // التغيير الكبير في الـ Render في الأسفل 👇)
+  // ==========================================
+  // 2. HELPER FUNCTIONS
+  // ==========================================
 
   const fetchUsageStats = async (userId) => {
     const today = new Date().toISOString().split('T')[0];
@@ -45,8 +49,12 @@ export default function FlowCraftLang() {
     if (!userId) { setUserTier('free'); return; }
     const { data: userData, error } = await supabase.from('users').select('subscription_status, subscription_tier').eq('id', userId).single();
     if (error && error.code !== 'PGRST116') { setUserTier('free'); return; }
-    if (userData && userData.subscription_status === 'active') { setUserTier(userData.subscription_tier || 'premium'); } 
-    else { if (!userData) { try { await supabase.from('users').insert([{ id: userId, subscription_status: 'free' }]).select(); } catch (e) {} } setUserTier('free'); }
+    if (userData && userData.subscription_status === 'active') {
+        setUserTier(userData.subscription_tier || 'premium');
+    } else {
+        if (!userData) { try { await supabase.from('users').insert([{ id: userId, subscription_status: 'free' }]).select(); } catch (e) {} }
+        setUserTier('free');
+    }
   };
 
   const handleAuthSubmit = async (isSignUp) => {
@@ -55,8 +63,9 @@ export default function FlowCraftLang() {
       let result;
       if (isSignUp) result = await supabase.auth.signUp({ email, password });
       else result = await supabase.auth.signInWithPassword({ email, password });
+      
       if (result.error) setAuthMessage(result.error.message);
-      else if (isSignUp) setAuthMessage("Signup successful! Check email.");
+      else if (isSignUp) setAuthMessage("Signup successful! Please check your email for confirmation.");
       setLoading(false);
   };
   
@@ -94,35 +103,56 @@ export default function FlowCraftLang() {
          setMessages(prev => [...prev, { role: 'assistant', content: cleanMsg + "\n\n🎉 Level Up!" }]);
          setCurrentLesson(prev => currentLesson + 1);
          speak(cleanMsg);
-      } else { setMessages(prev => [...prev, { role: 'assistant', content: aiMsgContent }]); }
+      } else {
+         setMessages(prev => [...prev, { role: 'assistant', content: aiMsgContent }]);
+      }
     } catch (err) {
       let errorMessage = err.message || "Unknown Error";
-      if (errorMessage.includes("LIMIT_EXCEEDED")) { alert("LIMIT EXCEEDED: Upgrade to Premium! ⚔️"); setMsgCount(3); } 
-      else { alert("Error: " + errorMessage); }
+      if (errorMessage.includes("LIMIT_EXCEEDED")) {
+          alert("LIMIT EXCEEDED: Your 3 free messages are done for today! Upgrade to Premium to continue your training. ⚔️");
+          setMsgCount(3);
+      } else if (errorMessage.includes("Server Error") || errorMessage.includes("Groq API Error")) {
+          alert("SYSTEM ERROR: AI service unavailable.");
+      } else { alert("Error: " + errorMessage); }
     } finally { setLoading(false); }
   };
 
+  // ✅ Updated Payment Logic with Cycle
   const handleCryptoUpgrade = async (tier) => {
     if (!session?.user?.id) { alert("Please log in first."); return; }
-    const planName = tier === 'premium' ? "Premium" : tier === 'chat' ? "Chat Only" : "Lessons Only";
-    const price = billingCycle === 'yearly' 
-        ? (tier === 'premium' ? "$140" : "$84") 
-        : (tier === 'premium' ? "$17" : "$10");
     
-    if(!window.confirm(`Start ${planName} for ${price}?`)) return;
+    // Calculate display price for confirmation
+    let priceDisplay = "";
+    if (billingCycle === 'yearly') {
+        priceDisplay = tier === 'premium' ? "$140 (Yearly)" : "$84 (Yearly)";
+    } else {
+        priceDisplay = tier === 'premium' ? "$17 (Monthly)" : "$10 (Monthly)";
+    }
+    
+    if(!window.confirm(`Start training with ${tier.toUpperCase()} for ${priceDisplay}?`)) return;
 
     setLoading(true);
     try {
       const response = await fetch('/api/create-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: session.user.id, tier: tier, cycle: billingCycle })
+        body: JSON.stringify({ 
+            userId: session.user.id, 
+            tier: tier, 
+            cycle: billingCycle 
+        })
       });
       const data = await response.json();
       if (!response.ok || data.error) throw new Error(data.error || 'Invoice creation failed.');
       window.location.href = data.invoice_url;
-    } catch (error) { alert("Error: " + error.message); } finally { setLoading(false); }
+    } catch (error) {
+      alert("Error creating invoice: " + error.message);
+    } finally { setLoading(false); }
   };
+
+  // ==========================================
+  // 3. EFFECTS
+  // ==========================================
 
   useEffect(() => {
     const handleAuthCheck = async (currentSession) => {
@@ -140,10 +170,9 @@ export default function FlowCraftLang() {
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   // ==========================================
-  // 4. THE NEW UI RENDERING (Anime Style) 🎨
+  // 4. RENDERING (Cyberpunk Style 🎨)
   // ==========================================
 
-  // LOADING
   if (authLoading) return <div className="min-h-screen bg-black flex items-center justify-center text-white"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-anime-accent shadow-[0_0_20px_#f472b6]"></div></div>;
   if (view === 'privacy') return <PrivacyPolicy setView={setView} />;
   if (view === 'refund') return <RefundPolicy setView={setView} />;
@@ -197,6 +226,8 @@ export default function FlowCraftLang() {
   if (!mode) {
     const userName = session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || "Shinobi";
     const messagesLeft = Math.max(0, 3 - msgCount);
+    
+    // Check specific access
     const hasChatAccess = userTier === 'premium' || userTier === 'chat';
     const hasLessonsAccess = userTier === 'premium' || userTier === 'lessons';
     const isFree = userTier === 'free';
@@ -208,8 +239,8 @@ export default function FlowCraftLang() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-anime-primary to-anime-accent ml-2">{userName}</span>-san!
         </h1>
         
-        {/* 🔥 THE NEW SMOOTH SLIDING TOGGLE 🔥 */}
-        <div className="relative flex items-center bg-gray-900/80 backdrop-blur border border-white/10 rounded-full p-1 mb-10 w-64 h-12 shadow-2xl">
+        {/* 🔥 THE SMOOTH SLIDING TOGGLE 🔥 */}
+        <div className="relative flex items-center bg-gray-900/80 backdrop-blur border border-white/10 rounded-full p-1 mb-10 w-64 h-12 shadow-2xl cursor-pointer">
             <div className={`absolute left-1 top-1 bottom-1 w-[calc(50%-4px)] bg-gradient-to-r from-anime-accent to-purple-600 rounded-full transition-all duration-300 ease-in-out shadow-[0_0_15px_#f472b6] ${billingCycle === 'yearly' ? 'translate-x-full' : 'translate-x-0'}`}></div>
             <button onClick={() => setBillingCycle('monthly')} className="w-1/2 relative z-10 font-bold text-sm transition-colors duration-300 text-center">Monthly</button>
             <button onClick={() => setBillingCycle('yearly')} className="w-1/2 relative z-10 font-bold text-sm transition-colors duration-300 text-center flex items-center justify-center gap-1">
@@ -235,7 +266,7 @@ export default function FlowCraftLang() {
         )}
 
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
-          {/* Chat Card */}
+          {/* Chat Mode Card */}
           <button 
             onClick={() => hasChatAccess ? setMode('chat') : null}
             className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${hasChatAccess ? 'bg-[#1e293b]/50 border-2 border-anime-primary/50 hover:border-anime-primary hover:shadow-[0_0_30px_rgba(56,189,248,0.3)]' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80'}`}
@@ -254,7 +285,7 @@ export default function FlowCraftLang() {
              )} 
           </button>
 
-          {/* Lessons Card */}
+          {/* Lessons Mode Card */}
           <button 
             onClick={() => hasLessonsAccess ? setMode('lessons') : null}
             className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${hasLessonsAccess ? 'bg-[#1e293b]/50 border-2 border-anime-accent/50 hover:border-anime-accent hover:shadow-[0_0_30px_rgba(244,114,182,0.3)]' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80'}`}
@@ -274,19 +305,20 @@ export default function FlowCraftLang() {
           </button>
         </div>
         
-        <button onClick={handleLogout} className="mt-12 text-gray-600 hover:text-white text-sm flex gap-2 items-center transition"><LogOut size={16}/> Log Out</button>
-        <footer className="mt-6 text-gray-700 text-xs flex gap-6">
-            <button onClick={() => setView('privacy')} className="hover:text-anime-primary transition">Privacy</button>
-            <button onClick={() => setView('refund')} className="hover:text-anime-primary transition">Terms</button>
+        <button onClick={handleLogout} className="mt-12 text-neon-red text-sm flex gap-2 items-center font-bold tracking-wide transition"><LogOut size={18} className="drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]"/> ABORT MISSION (LOG OUT)</button>
+        <footer className="mt-10 mb-6 flex gap-8">
+            <button onClick={() => setView('privacy')} className="text-neon-white text-xs font-bold tracking-widest uppercase">Privacy Protocol</button>
+            <button onClick={() => setView('refund')} className="text-neon-white text-xs font-bold tracking-widest uppercase">Refund Rules</button>
+            <a href="mailto:support@flowcraftco.com" className="text-neon-white text-xs font-bold tracking-widest uppercase">Comms Link</a>
         </footer>
       </div>
     );
   }
 
-  // E. CHAT INTERFACE (Simple & Clean)
+  // E. CHAT INTERFACE
   return (
     <div className="flex h-screen bg-[#050505] text-white font-sans overflow-hidden">
-      {/* ... (نفس كود الشات السابق تماماً - لا تغييرات كبيرة في التصميم هنا للحفاظ على الأداء) ... */}
+      {/* ... (Chat Interface remains standard for performance) ... */}
       <div className="md:hidden fixed top-0 w-full bg-[#050505]/90 backdrop-blur border-b border-white/10 p-4 flex justify-between items-center z-50">
         <div className="font-manga text-xl text-anime-primary tracking-widest">FlowCraft</div>
         <button onClick={() => setMode(null)} className="text-xs bg-white/10 px-3 py-1 rounded">Menu</button>
