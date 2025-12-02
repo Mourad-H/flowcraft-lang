@@ -264,11 +264,6 @@ export default function FlowCraftLang() {
              fetchUsageStats(currentSession.user.id)
           ]);
           
-          // ✅ 2. أضف الكود هنا بالضبط (بعد التأكد من وجود المستخدم):
-          const hasSeenTips = localStorage.getItem('flowcraft_tips_seen');
-          if (!hasSeenTips) {
-            setShowTechTips(true);
-          }
         }
       } catch (err) { console.error("Auth Check Error:", err); } finally { setAuthLoading(false); }
     };
