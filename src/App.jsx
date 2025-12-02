@@ -170,11 +170,11 @@ export default function FlowCraftLang() {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel(); // إيقاف القديم
 
-    // 1. تنظيف النص: إزالة [System Tags] + الإيموجي + الأقواس () + الفواصل ,
+        // 1. تنظيف النص
     let cleanText = text
-        .replace(/\[.*?\]/g, "")          // حذف [LESSON_COMPLETE]
-        .replace(/[\(\),]/g, "")          // 🛑 حذف الأقواس والفواصل (، , ( ))
-        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, ''); // حذف الإيموجي
+        .replace(/\[.*?\]/g, "")          
+        .replace(/[\(\),\.]/g, "")  // 👈 التعديل هنا: أضفنا \. داخل القوسين
+        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, ''); 
 
     // 2. تقسيم النص بناءً على الأقواس الذكية {{ }} (للتفريق بين اللغات)
     const parts = cleanText.split(/\{\{(.*?)\}\}/g);
