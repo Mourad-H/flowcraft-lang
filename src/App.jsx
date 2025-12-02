@@ -547,7 +547,9 @@ export default function FlowCraftLang() {
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[85%] md:max-w-2xl p-5 rounded-2xl shadow-lg ${msg.role === 'user' ? 'bg-anime-primary text-black font-bold rounded-tr-none' : 'bg-[#1e293b] border border-white/10 rounded-tl-none'}`}>
-                <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+                <div className="whitespace-pre-wrap leading-relaxed">
+    {msg.content.replace(/\{\{/g, '').replace(/\}\}/g, '')}
+</div>
                 {msg.role === 'assistant' && <button onClick={() => speak(msg.content)} className="mt-3 text-xs opacity-60 hover:opacity-100 flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-full transition"><Volume2 size={14}/> Listen</button>}
               </div>
             </div>
