@@ -164,12 +164,6 @@ export default function FlowCraftLang() {
     setSession(null);
   };
 
-    const dismissTips = () => {
-    setShowTechTips(false);
-    // نضع علامة في متصفح المستخدم أنه رأى الرسالة، لكي لا تظهر له مجدداً أبداً
-    localStorage.setItem('flowcraft_tips_seen', 'true');
-  };
-
   const speak = (text) => {
     if (!window.speechSynthesis) return;
     const cleanText = text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
