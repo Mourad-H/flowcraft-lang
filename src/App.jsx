@@ -322,6 +322,7 @@ export default function FlowCraftLang() {
   if (authLoading) return <div className="min-h-screen bg-black flex items-center justify-center text-white"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-anime-accent shadow-[0_0_20px_#f472b6]"></div></div>;
   if (view === 'privacy') return <PrivacyPolicy setView={setView} />;
   if (view === 'refund') return <RefundPolicy setView={setView} />;
+  if (view === 'terms') return <Terms setView={setView} />; 
 
   // LANDING PAGE
   if (!session) {
