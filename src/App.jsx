@@ -165,53 +165,59 @@ export default function FlowCraftLang() {
     setSession(null);
   };
 
-        // دالة نطق ذكية جداً (تكتشف اللغة تلقائياً حتى بدون أقواس)
-  const speak = (text) => {
+          const speak = (text) => {
     if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); // إيقاف القديم
+    window.speechSynthesis.cancel(); 
 
-    // 1. تنظيف النص (حذف رموز النظام والأقواس والفواصل المزعجة)
+    // 1. تنظيف النص: إزالة علامات الترقيم المزعجة تماماً
+    // نحذف: الأقواس، الفواصل، النقاط، وعلامات الاستفهام
+    // ونستبدلها بمسافة لكي لا تلتصق الكلمات
     let cleanText = text
-        .replace(/\[.*?\]/g, "")
-        .replace(/[\(\),]/g, "") 
-        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
+        .replace(/\[.*?\]/g, "")            // حذف وسوم النظام
+        .replace(/[\(\),\.\?؟!]/g, " ")      // استبدال علامات الترقيم بمسافة (وقفة صامتة)
+        .replace(/\s+/g, " ")               // إزالة المسافات الزائدة
+        .trim();
 
-    // 2. التقسيم بناءً على الأقواس {{ }} التي يضعها الـ AI
-    const parts = cleanText.split(/\{\{(.*?)\}\}/g);
+    // 2. التقسيم الذكي: نفصل عند وجود تبديل بين اللغات
+    // هذه المعادلة (Regex) تفصل النص إلى مصفوفة تحتوي على المقاطع اليابانية والإنجليزية
+    // \u3000-\u303f : علامات الترقيم اليابانية
+    // \u3040-\u309f : هيراغانا
+    // \u30a0-\u30ff : كاتاكانا
+    // \u4e00-\u9faf : كانجي
+    const parts = cleanText.split(/([\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+)/g);
 
     const voices = window.speechSynthesis.getVoices();
     
-    // البحث عن أفضل الأصوات المتاحة
+    // البحث عن أفضل صوت ياباني (Google > Microsoft > Default)
     const jaVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || voices.find(v => v.lang === 'ja-JP');
+    
+    // البحث عن صوت إنجليزي
     const enVoice = voices.find(v => v.lang.includes("en-US")) || voices.find(v => v.lang.includes("en"));
 
-    // 3. التشغيل الذكي
-    parts.forEach((part, index) => {
-        if (!part.trim()) return; 
+    // 3. تشغيل القطع بالتتابع
+    parts.forEach((part) => {
+        if (!part.trim()) return; // تجاهل الفراغات
 
         const utterance = new SpeechSynthesisUtterance(part);
         
-        // 🛑 الفحص المزدوج:
-        // 1. هل هي داخل قوسين {{ }}؟ (الاندكس الفردي)
-        // 2. أو هل تحتوي فعلاً على حروف يابانية؟ (للحالات التي ينسى فيها الـ AI الأقواس)
-        const hasJapaneseChars = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/.test(part);
-        const isExplicitJapanese = index % 2 === 1;
+        // فحص: هل القطعة تحتوي على يابانية؟
+        const isJapanese = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/.test(part);
 
-        if (isExplicitJapanese || hasJapaneseChars) {
+        if (isJapanese) {
             utterance.lang = 'ja-JP';
             if (jaVoice) utterance.voice = jaVoice;
-            utterance.rate = 0.9; // إبطاء اليابانية قليلاً للوضوح
+            utterance.rate = 0.9; // أبطأ لليابانية
+            utterance.pitch = 1.0;
         } else {
             utterance.lang = 'en-US';
             if (enVoice) utterance.voice = enVoice;
-            utterance.rate = 1.1; // تسريع الشرح الإنجليزي قليلاً
+            utterance.rate = 1.1; // أسرع للإنجليزية
+            utterance.pitch = 1.1;
         }
         
         window.speechSynthesis.speak(utterance);
     });
   };
-
-
 
 
   const handleSend = async () => {
