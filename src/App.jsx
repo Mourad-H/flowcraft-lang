@@ -165,54 +165,46 @@ export default function FlowCraftLang() {
     setSession(null);
   };
 
-          const speak = (text) => {
+            const speak = (text) => {
     if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); 
+    window.speechSynthesis.cancel();
 
-    // 1. تنظيف النص: إزالة علامات الترقيم المزعجة تماماً
-    // نحذف: الأقواس، الفواصل، النقاط، وعلامات الاستفهام
-    // ونستبدلها بمسافة لكي لا تلتصق الكلمات
+    // 1. التعديل هنا: تنظيف ذكي
+    // - نحذف الأقواس () وأكواد النظام [] والإيموجي
+    // - ✅ نترك الفاصلة (,) والنقطة (.) وعلامات الاستفهام والتعجب (!?) كما هي
+    // - المحرك الصوتي يفهم هذه الرموز تلقائياً كـ "سكتات" ونبرات صوتية
     let cleanText = text
-        .replace(/\[.*?\]/g, "")            // حذف وسوم النظام
-        .replace(/[\(\),\.\?؟!]/g, " ")      // استبدال علامات الترقيم بمسافة (وقفة صامتة)
-        .replace(/\s+/g, " ")               // إزالة المسافات الزائدة
+        .replace(/\[.*?\]/g, "")            // حذف [System Tags]
+        .replace(/[\(\)]/g, "")             // حذف الأقواس فقط (تبقي ما بداخلها)
+        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '') // حذف الإيموجي
         .trim();
 
-    // 2. التقسيم الذكي: نفصل عند وجود تبديل بين اللغات
-    // هذه المعادلة (Regex) تفصل النص إلى مصفوفة تحتوي على المقاطع اليابانية والإنجليزية
-    // \u3000-\u303f : علامات الترقيم اليابانية
-    // \u3040-\u309f : هيراغانا
-    // \u30a0-\u30ff : كاتاكانا
-    // \u4e00-\u9faf : كانجي
+    // 2. التقسيم الذكي بين اليابانية والإنجليزية
+    // (هذا الـ Regex يفصل عند أي حرف ياباني)
     const parts = cleanText.split(/([\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+)/g);
 
     const voices = window.speechSynthesis.getVoices();
-    
-    // البحث عن أفضل صوت ياباني (Google > Microsoft > Default)
     const jaVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || voices.find(v => v.lang === 'ja-JP');
-    
-    // البحث عن صوت إنجليزي
     const enVoice = voices.find(v => v.lang.includes("en-US")) || voices.find(v => v.lang.includes("en"));
 
-    // 3. تشغيل القطع بالتتابع
+    // 3. التشغيل بالتتابع
     parts.forEach((part) => {
-        if (!part.trim()) return; // تجاهل الفراغات
+        // نتجاهل الفراغات، لكن نسمح بعلامات الترقيم المنفصلة إذا كانت جزءاً من الجملة
+        if (!part.trim()) return;
 
         const utterance = new SpeechSynthesisUtterance(part);
         
-        // فحص: هل القطعة تحتوي على يابانية؟
+        // فحص: هل القطعة تحتوي على حروف يابانية؟
         const isJapanese = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/.test(part);
 
         if (isJapanese) {
             utterance.lang = 'ja-JP';
             if (jaVoice) utterance.voice = jaVoice;
-            utterance.rate = 0.9; // أبطأ لليابانية
-            utterance.pitch = 1.0;
+            utterance.rate = 0.9; 
         } else {
             utterance.lang = 'en-US';
             if (enVoice) utterance.voice = enVoice;
-            utterance.rate = 1.1; // أسرع للإنجليزية
-            utterance.pitch = 1.1;
+            utterance.rate = 1.1; 
         }
         
         window.speechSynthesis.speak(utterance);
