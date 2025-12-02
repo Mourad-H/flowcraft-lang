@@ -250,28 +250,69 @@ export default function FlowCraftLang() {
     } finally { setLoading(false); }
   };
 
-  // ==========================================
-  // 3. EFFECTS
+    // ==========================================
+  // 3. EFFECTS (With Safety Valve 🛡️)
   // ==========================================
 
-    useEffect(() => {
+  useEffect(() => {
+    let mounted = true;
+
+    // دالة التحقق من البيانات
     const handleAuthCheck = async (currentSession) => {
       try {
         if (currentSession?.user) {
-          // 1. جلب البيانات الحيوية (الاشتراك والعداد)
           await Promise.all([
              checkSubscription(currentSession.user.id),
              fetchUsageStats(currentSession.user.id)
           ]);
-          
         }
-      } catch (err) { console.error("Auth Check Error:", err); } finally { setAuthLoading(false); }
+      } catch (err) { 
+        console.error("Auth Check Error:", err); 
+      } finally { 
+        if (mounted) setAuthLoading(false); 
+      }
     };
 
-    return () => subscription.unsubscribe();
-  }, []);
+    // 1. محاولة جلب الجلسة (مع معالجة الخطأ)
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        console.error("Session Error:", error);
+        if (mounted) setAuthLoading(false); // إذا حدث خطأ، أوقف التحميل فوراً
+        return;
+      }
+      
+      if (mounted) {
+        setSession(data.session);
+        if (data.session) handleAuthCheck(data.session);
+        else setAuthLoading(false);
+      }
+    }).catch((err) => {
+        console.error("Critical Session Fail:", err);
+        if (mounted) setAuthLoading(false); // شبكة الأمان الأولى
+    });
 
-  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+    // 2. مراقب التغييرات
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) setSession(session);
+      if (session) handleAuthCheck(session);
+      else if (mounted) setAuthLoading(false);
+    });
+
+    // 🛑 3. صمام الأمان الأخير (Timeout)
+    // إذا علق النظام لأكثر من 5 ثوانٍ، أوقف التحميل بالقوة
+    const safetyTimer = setTimeout(() => {
+        if (authLoading) {
+            console.warn("Force stopping loading screen...");
+            setAuthLoading(false);
+        }
+    }, 5000); // 5 ثواني كحد أقصى
+
+    return () => {
+        mounted = false;
+        clearTimeout(safetyTimer);
+        subscription.unsubscribe();
+    };
+  }, []);
 
   // ==========================================
   // 4. RENDERING
