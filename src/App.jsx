@@ -165,48 +165,52 @@ export default function FlowCraftLang() {
     setSession(null);
   };
 
-      // دالة النطق المنقحة (No Punctuation + Smart Language)
+        // دالة نطق ذكية جداً (تكتشف اللغة تلقائياً حتى بدون أقواس)
   const speak = (text) => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel(); // إيقاف القديم
 
-            // 1. تنظيف واستبدال ذكي
+    // 1. تنظيف النص (حذف رموز النظام والأقواس والفواصل المزعجة)
     let cleanText = text
         .replace(/\[.*?\]/g, "")
-        .replace(/[\(\)]/g, "")      // حذف الأقواس فقط
-        .replace(/,/g, "、")         // ✅ استبدال الفاصلة الإنجليزية بفاصلة يابانية (وقفة قصيرة)
-        .replace(/\./g, "。")        // ✅ استبدال النقطة الإنجليزية بنقطة يابانية (وقفة طويلة)
+        .replace(/[\(\),]/g, "") 
         .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
 
-
-    // 2. تقسيم النص بناءً على الأقواس الذكية {{ }} (للتفريق بين اللغات)
+    // 2. التقسيم بناءً على الأقواس {{ }} التي يضعها الـ AI
     const parts = cleanText.split(/\{\{(.*?)\}\}/g);
 
     const voices = window.speechSynthesis.getVoices();
+    
+    // البحث عن أفضل الأصوات المتاحة
     const jaVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || voices.find(v => v.lang === 'ja-JP');
     const enVoice = voices.find(v => v.lang.includes("en-US")) || voices.find(v => v.lang.includes("en"));
 
-    // 3. تشغيل القطع بالتتابع
+    // 3. التشغيل الذكي
     parts.forEach((part, index) => {
         if (!part.trim()) return; 
 
         const utterance = new SpeechSynthesisUtterance(part);
         
-        // الاندكس الفردي (داخل {{ }}) = ياباني
-        // الاندكس الزوجي (خارج {{ }}) = إنجليزي
-        if (index % 2 === 1) {
+        // 🛑 الفحص المزدوج:
+        // 1. هل هي داخل قوسين {{ }}؟ (الاندكس الفردي)
+        // 2. أو هل تحتوي فعلاً على حروف يابانية؟ (للحالات التي ينسى فيها الـ AI الأقواس)
+        const hasJapaneseChars = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/.test(part);
+        const isExplicitJapanese = index % 2 === 1;
+
+        if (isExplicitJapanese || hasJapaneseChars) {
             utterance.lang = 'ja-JP';
             if (jaVoice) utterance.voice = jaVoice;
-            utterance.rate = 0.9; 
+            utterance.rate = 0.9; // إبطاء اليابانية قليلاً للوضوح
         } else {
             utterance.lang = 'en-US';
             if (enVoice) utterance.voice = enVoice;
-            utterance.rate = 1.1; 
+            utterance.rate = 1.1; // تسريع الشرح الإنجليزي قليلاً
         }
         
         window.speechSynthesis.speak(utterance);
     });
   };
+
 
 
 
