@@ -165,45 +165,46 @@ export default function FlowCraftLang() {
     setSession(null);
   };
 
-    // دالة النطق متعددة اللغات (The Polyglot Speaker)
+      // دالة النطق المنقحة (No Punctuation + Smart Language)
   const speak = (text) => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel(); // إيقاف القديم
 
-    // 1. تنظيف النص من أكواد النظام (مثل [LESSON_COMPLETE])
-    let cleanText = text.replace(/\[.*?\]/g, "");
-    
-    // 2. تقسيم النص بناءً على الأقواس {{ }}
-    // هذا سينتج مصفوفة مثل: ["To say hello, use ", " Konnichiwa ", "."]
+    // 1. تنظيف النص: إزالة [System Tags] + الإيموجي + الأقواس () + الفواصل ,
+    let cleanText = text
+        .replace(/\[.*?\]/g, "")          // حذف [LESSON_COMPLETE]
+        .replace(/[\(\),]/g, "")          // 🛑 حذف الأقواس والفواصل (، , ( ))
+        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, ''); // حذف الإيموجي
+
+    // 2. تقسيم النص بناءً على الأقواس الذكية {{ }} (للتفريق بين اللغات)
     const parts = cleanText.split(/\{\{(.*?)\}\}/g);
 
     const voices = window.speechSynthesis.getVoices();
-    // البحث عن أفضل الأصوات
     const jaVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || voices.find(v => v.lang === 'ja-JP');
     const enVoice = voices.find(v => v.lang.includes("en-US")) || voices.find(v => v.lang.includes("en"));
 
     // 3. تشغيل القطع بالتتابع
     parts.forEach((part, index) => {
-        if (!part.trim()) return; // تجاهل الفراغات
+        if (!part.trim()) return; 
 
         const utterance = new SpeechSynthesisUtterance(part);
         
-        // إذا كان الاندكس فردياً (1, 3, 5) فهو النص الذي كان داخل الأقواس {{ }} -> ياباني
-        // إذا كان زوجياً (0, 2, 4) فهو النص الخارجي -> إنجليزي
+        // الاندكس الفردي (داخل {{ }}) = ياباني
+        // الاندكس الزوجي (خارج {{ }}) = إنجليزي
         if (index % 2 === 1) {
             utterance.lang = 'ja-JP';
             if (jaVoice) utterance.voice = jaVoice;
-            utterance.rate = 0.9; // أبطأ قليلاً للوضوح
+            utterance.rate = 0.9; 
         } else {
             utterance.lang = 'en-US';
             if (enVoice) utterance.voice = enVoice;
-            utterance.rate = 1.1; // أسرع قليلاً للشرح
+            utterance.rate = 1.1; 
         }
         
-        // وضعهم في الطابور (Queue) ليتم نطقهم وراء بعض
         window.speechSynthesis.speak(utterance);
     });
   };
+
 
 
   const handleSend = async () => {
