@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     const subscriptionStatus = user?.subscription_status || 'free'; 
 
     if (subscriptionStatus !== 'active') {
-        const DAILY_LIMIT = 3; 
+        const DAILY_LIMIT = 10; 
         const today = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate())).toISOString(); 
         const { count } = await supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', today).eq('role', 'user'); 
         if (count >= DAILY_LIMIT) return res.status(403).json({ error: "LIMIT_EXCEEDED" });
