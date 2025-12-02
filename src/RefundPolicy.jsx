@@ -19,8 +19,11 @@ export const RefundPolicy = ({ setView }) => (
         </h1>
         {/* تم تفتيح اللون هنا */}
         <p className="text-gray-300 mb-10 font-mono text-sm border-b border-white/10 pb-6">
-          Last Protocol Update: December 1, 2025
-        </p>
+  Last Protocol Update: December 1, 2025 <br/>
+  <strong>Operator:</strong> Mourad Hamel (Sole Proprietor) <br/>
+  <strong>Business Location:</strong> Algeria
+</p>
+
 
         {/* ✅ التعديل الرئيسي: لون فاتح جداً (slate-200) مع ظل خفيف للقراءة */}
         <div className="space-y-8 text-slate-200 leading-relaxed text-lg drop-shadow-md">
