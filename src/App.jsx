@@ -203,7 +203,8 @@ export default function FlowCraftLang() {
         }
                 
 
-        // 🎭 بداية كود المشاعر (Liveliness Hack) 🎭
+        
+// 🎭 بداية كود المشاعر (Liveliness Hack) 🎭
         
         // القيم الافتراضية
         let dynamicPitch = 1.0;
@@ -228,8 +229,7 @@ export default function FlowCraftLang() {
         utterance.rate = isJapanese ? dynamicRate * 0.9 : dynamicRate; // اليابانية دائماً أبطأ قليلاً للوضوح
 
         // 🎭 نهاية كود المشاعر 🎭
-
-        window.speechSynthesis.speak(utterance);
+        
 
         window.speechSynthesis.speak(utterance);
     });
