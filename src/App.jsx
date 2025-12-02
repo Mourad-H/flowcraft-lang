@@ -347,6 +347,31 @@ export default function FlowCraftLang() {
 
     return (
       <div className="min-h-screen bg-[#050505] anime-grid-bg text-white p-6 flex flex-col items-center justify-center">
+              {/* 🆕 نافذة النصائح التقنية (تظهر مرة واحدة فقط) */}
+        {showTechTips && (
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-[#1e293b] border-2 border-anime-primary p-6 rounded-2xl max-w-md w-full shadow-[0_0_50px_rgba(56,189,248,0.3)] animate-bounce-in">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="text-anime-primary">ℹ️</div> {/* أو استخدم أيقونة Info من lucide */}
+                    <h2 className="text-xl font-bold text-white">Voice Setup Required! 🔊</h2>
+                </div>
+                <div className="text-gray-300 text-sm space-y-4 mb-6">
+                    <p>For the AI to speak Japanese correctly, please ensure:</p>
+                    <ul className="list-disc ml-5 space-y-2">
+                        <li>You are using <strong>Google Chrome</strong>.</li>
+                        <li>You have <strong>Japanese Voice Data</strong> installed in your device settings.</li>
+                    </ul>
+                    <p className="text-xs text-gray-500 italic">Otherwise, the AI might sound... weird.</p>
+                </div>
+                <button 
+                    onClick={dismissTips}
+                    className="w-full bg-anime-primary text-black font-bold py-3 rounded-xl hover:bg-cyan-300 transition"
+                >
+                    Understood, Sensei! 🥋
+                </button>
+            </div>
+          </div>
+        )}
         <h1 className="text-4xl md:text-5xl font-manga mb-2 text-center">
             {isNewUser ? "Welcome to the Dojo! 🥋" : "Okaeri, "} 
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-anime-primary to-anime-accent ml-2">{userName}</span>-san!
