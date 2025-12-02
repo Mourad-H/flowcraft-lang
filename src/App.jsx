@@ -71,15 +71,41 @@ export default function FlowCraftLang() {
     recognition.start();
   };
 
-  const enterMode = (selectedMode) => {
-    setMode(selectedMode);
-    setMessages([]); 
-    if (selectedMode === 'chat') {
-        setMessages([{ role: 'assistant', content: "Yo! FlowSensei here. 🕶️\n\nI'm ready to chat about anything! What anime are you watching?" }]);
-    } else if (selectedMode === 'lessons') {
-        setMessages([{ role: 'assistant', content: `Osu! 🥋\n\nWelcome to **Lesson ${currentLesson}**.\nLet's begin your training!` }]);
+     // دالة لاسترجاع أرشيف المحادثات من قاعدة البيانات
+  const loadChatHistory = async (currentMode) => {
+    if (!session?.user?.id) return;
+
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('role, content')
+      .eq('user_id', session.user.id)
+      .eq('mode', currentMode) // نجلب رسائل المود المختار فقط (شات أو دروس)
+      .order('created_at', { ascending: true }); // ترتيب من الأقدم للأحدث
+
+    if (!error && data && data.length > 0) {
+        setMessages(data);
+    } else {
+        // إذا لم يكن هناك رسائل سابقة، نضع رسالة الترحيب الافتراضية
+        if (currentMode === 'chat') {
+            setMessages([{ role: 'assistant', content: "Yo! FlowSensei here. 🕶️\n\nI'm ready to chat about anything! What anime are you watching?" }]);
+        } else if (currentMode === 'lessons') {
+            setMessages([{ role: 'assistant', content: `Osu! 🥋\n\nWelcome to **Lesson ${currentLesson}**.\nLet's begin your training!` }]);
+        }
     }
   };
+
+
+    const enterMode = (selectedMode) => {
+    setMode(selectedMode);
+    setMessages([]); // تنظيف مؤقت للشاشة
+    setLoading(true);
+    
+    // استدعاء التاريخ
+    loadChatHistory(selectedMode).then(() => {
+        setLoading(false);
+    });
+  };
+
 
   const fetchUsageStats = async (userId) => {
     const now = new Date();
