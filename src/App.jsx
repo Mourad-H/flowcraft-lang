@@ -255,29 +255,24 @@ export default function FlowCraftLang() {
   // 3. EFFECTS
   // ==========================================
 
-  useEffect(() => {
+    useEffect(() => {
     const handleAuthCheck = async (currentSession) => {
       try {
         if (currentSession?.user) {
+          // 1. جلب البيانات الحيوية (الاشتراك والعداد)
           await Promise.all([
              checkSubscription(currentSession.user.id),
              fetchUsageStats(currentSession.user.id)
           ]);
+          
+          // ✅ 2. أضف الكود هنا بالضبط (بعد التأكد من وجود المستخدم):
+          const hasSeenTips = localStorage.getItem('flowcraft_tips_seen');
+          if (!hasSeenTips) {
+            setShowTechTips(true);
+          }
         }
       } catch (err) { console.error("Auth Check Error:", err); } finally { setAuthLoading(false); }
     };
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) handleAuthCheck(session);
-      else setAuthLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) handleAuthCheck(session);
-      else setAuthLoading(false);
-    });
 
     return () => subscription.unsubscribe();
   }, []);
