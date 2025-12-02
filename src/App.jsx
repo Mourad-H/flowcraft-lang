@@ -21,7 +21,6 @@ export default function FlowCraftLang() {
   const [view, setView] = useState('home');
   const [msgCount, setMsgCount] = useState(0);
   const [isListening, setIsListening] = useState(false); // 🎤 حالة الميكروفون
-    // حالة نافذة النصائح التقنية
   const [showTechTips, setShowTechTips] = useState(false);
 
   
