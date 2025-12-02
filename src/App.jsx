@@ -166,7 +166,8 @@ export default function FlowCraftLang() {
   };
 
                 // دالة النطق المنقحة (No Punctuation + Smart Language)
-  const speak = (text) => {
+  
+   const speak = (text) => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel(); // إيقاف القديم
 
@@ -200,7 +201,36 @@ export default function FlowCraftLang() {
             if (enVoice) utterance.voice = enVoice;
             utterance.rate = 1.1; 
         }
+                
+
+        // 🎭 بداية كود المشاعر (Liveliness Hack) 🎭
         
+        // القيم الافتراضية
+        let dynamicPitch = 1.0;
+        let dynamicRate = 1.0;
+
+        // تحليل "مشاعر" النص بناءً على الرموز
+        if (part.includes("!") || part.includes("！")) {
+            // حماس: صوت أعلى وأسرع قليلاً
+            dynamicPitch = 1.2; 
+            dynamicRate = 1.1; 
+        } else if (part.includes("?") || part.includes("？")) {
+            // سؤال: نبرة مرتفعة قليلاً
+            dynamicPitch = 1.1;
+        } else if (part.includes("...") || part.includes("…")) {
+            // تردد/تفكير: بطيء ومنخفض
+            dynamicRate = 0.8;
+            dynamicPitch = 0.9;
+        }
+
+        // تطبيق القيم على الصوت
+        utterance.pitch = dynamicPitch;
+        utterance.rate = isJapanese ? dynamicRate * 0.9 : dynamicRate; // اليابانية دائماً أبطأ قليلاً للوضوح
+
+        // 🎭 نهاية كود المشاعر 🎭
+
+        window.speechSynthesis.speak(utterance);
+
         window.speechSynthesis.speak(utterance);
     });
   };
