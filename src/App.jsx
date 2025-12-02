@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient';
 import { Zap, MessageCircle, BookOpen, Lock, Star, ChevronRight, Send, Volume2, LogOut, Mic, MicOff } from 'lucide-react';
 import { PrivacyPolicy } from './PrivacyPolicy';
 import { RefundPolicy } from './RefundPolicy';
+import { Terms } from './Terms'; 
 
 export default function FlowCraftLang() {
   // ==========================================
