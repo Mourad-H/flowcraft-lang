@@ -165,39 +165,33 @@ export default function FlowCraftLang() {
     setSession(null);
   };
 
-              const speak = (text) => {
+                // دالة النطق المنقحة (No Punctuation + Smart Language)
+  const speak = (text) => {
     if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); 
+    window.speechSynthesis.cancel(); // إيقاف القديم
 
-    // 1. تنظيف النص: التعديل هنا
-    // ✅ نحذف الأقواس () و [] لأنها لا تفيد في النطق
-    // ✅ نترك الفواصل والنقاط (، , . ? !) لأنها ضرورية لكي "يتنفس" البوت ويتوقف
+    // 1. تنظيف النص: إزالة [System Tags] + الإيموجي + الأقواس () + الفواصل ,
     let cleanText = text
-        .replace(/\[.*?\]/g, "")            // حذف وسوم النظام [LESSON_COMPLETE]
-        .replace(/[\(\)]/g, "")             // حذف الأقواس فقط
-        .replace(/\s+/g, " ")               // إزالة المسافات الزائدة
-        .trim();
+        .replace(/\[.*?\]/g, "")          // حذف [LESSON_COMPLETE]
+        .replace(/[\(\),]/g, "")          // 🛑 حذف الأقواس والفواصل (، , ( ))
+        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, ''); // حذف الإيموجي
 
-    // 2. التقسيم الذكي
-    // هذه المعادلة تفصل اليابانية عن الإنجليزية مع الحفاظ على علامات الترقيم
-    const parts = cleanText.split(/([\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+)/g);
+    // 2. تقسيم النص بناءً على الأقواس الذكية {{ }} (للتفريق بين اللغات)
+    const parts = cleanText.split(/\{\{(.*?)\}\}/g);
 
     const voices = window.speechSynthesis.getVoices();
-    
-    // البحث عن أفضل الأصوات
     const jaVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || voices.find(v => v.lang === 'ja-JP');
     const enVoice = voices.find(v => v.lang.includes("en-US")) || voices.find(v => v.lang.includes("en"));
 
     // 3. تشغيل القطع بالتتابع
-    parts.forEach((part) => {
+    parts.forEach((part, index) => {
         if (!part.trim()) return; 
 
         const utterance = new SpeechSynthesisUtterance(part);
         
-        // فحص اللغة
-        const isJapanese = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/.test(part);
-
-        if (isJapanese) {
+        // الاندكس الفردي (داخل {{ }}) = ياباني
+        // الاندكس الزوجي (خارج {{ }}) = إنجليزي
+        if (index % 2 === 1) {
             utterance.lang = 'ja-JP';
             if (jaVoice) utterance.voice = jaVoice;
             utterance.rate = 0.9; 
@@ -210,6 +204,7 @@ export default function FlowCraftLang() {
         window.speechSynthesis.speak(utterance);
     });
   };
+
 
 
 
