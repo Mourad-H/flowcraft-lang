@@ -165,36 +165,36 @@ export default function FlowCraftLang() {
     setSession(null);
   };
 
-            const speak = (text) => {
+              const speak = (text) => {
     if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
+    window.speechSynthesis.cancel(); 
 
-    // 1. التعديل هنا: تنظيف ذكي
-    // - نحذف الأقواس () وأكواد النظام [] والإيموجي
-    // - ✅ نترك الفاصلة (,) والنقطة (.) وعلامات الاستفهام والتعجب (!?) كما هي
-    // - المحرك الصوتي يفهم هذه الرموز تلقائياً كـ "سكتات" ونبرات صوتية
+    // 1. تنظيف النص: التعديل هنا
+    // ✅ نحذف الأقواس () و [] لأنها لا تفيد في النطق
+    // ✅ نترك الفواصل والنقاط (، , . ? !) لأنها ضرورية لكي "يتنفس" البوت ويتوقف
     let cleanText = text
-        .replace(/\[.*?\]/g, "")            // حذف [System Tags]
-        .replace(/[\(\)]/g, "")             // حذف الأقواس فقط (تبقي ما بداخلها)
-        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '') // حذف الإيموجي
+        .replace(/\[.*?\]/g, "")            // حذف وسوم النظام [LESSON_COMPLETE]
+        .replace(/[\(\)]/g, "")             // حذف الأقواس فقط
+        .replace(/\s+/g, " ")               // إزالة المسافات الزائدة
         .trim();
 
-    // 2. التقسيم الذكي بين اليابانية والإنجليزية
-    // (هذا الـ Regex يفصل عند أي حرف ياباني)
+    // 2. التقسيم الذكي
+    // هذه المعادلة تفصل اليابانية عن الإنجليزية مع الحفاظ على علامات الترقيم
     const parts = cleanText.split(/([\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+)/g);
 
     const voices = window.speechSynthesis.getVoices();
+    
+    // البحث عن أفضل الأصوات
     const jaVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || voices.find(v => v.lang === 'ja-JP');
     const enVoice = voices.find(v => v.lang.includes("en-US")) || voices.find(v => v.lang.includes("en"));
 
-    // 3. التشغيل بالتتابع
+    // 3. تشغيل القطع بالتتابع
     parts.forEach((part) => {
-        // نتجاهل الفراغات، لكن نسمح بعلامات الترقيم المنفصلة إذا كانت جزءاً من الجملة
-        if (!part.trim()) return;
+        if (!part.trim()) return; 
 
         const utterance = new SpeechSynthesisUtterance(part);
         
-        // فحص: هل القطعة تحتوي على حروف يابانية؟
+        // فحص اللغة
         const isJapanese = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/.test(part);
 
         if (isJapanese) {
@@ -210,6 +210,7 @@ export default function FlowCraftLang() {
         window.speechSynthesis.speak(utterance);
     });
   };
+
 
 
   const handleSend = async () => {
