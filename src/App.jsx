@@ -357,10 +357,14 @@ export default function FlowCraftLang() {
               {authMessage && <p className="text-anime-accent text-sm mt-2 font-bold bg-anime-accent/10 p-2 rounded">{authMessage}</p>}
             </div>
           </div>
-          <footer className="mt-20 text-gray-500 text-sm flex gap-6">
-            <button onClick={() => setView('privacy')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Privacy Protocol</button>
-            <button onClick={() => setView('refund')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Refund Rules</button>
-          </footer>
+          <footer className="mt-10 mb-6 flex gap-6 justify-center flex-wrap">
+    <button onClick={() => setView('privacy')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Privacy</button>
+    <button onClick={() => setView('refund')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Refund Policy</button>
+    {/* ✅ الزر الجديد */}
+    <button onClick={() => setView('terms')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Terms & Conditions</button>
+    <a href="mailto:support@flowcraftco.com" className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Support</a>
+</footer>
+
         </div>
       </div>
     );
@@ -467,11 +471,14 @@ export default function FlowCraftLang() {
         </div>
         
         <button onClick={handleLogout} className="mt-12 text-neon-red text-sm flex gap-2 items-center font-bold tracking-wide transition"><LogOut size={18} className="drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]"/> ABORT MISSION (LOG OUT)</button>
-        <footer className="mt-10 mb-6 flex gap-8">
-            <button onClick={() => setView('privacy')} className="text-neon-white text-xs font-bold tracking-widest uppercase">Privacy Protocol</button>
-            <button onClick={() => setView('refund')} className="text-neon-white text-xs font-bold tracking-widest uppercase">Refund Rules</button>
-            <a href="mailto:support@flowcraftco.com" className="text-neon-white text-xs font-bold tracking-widest uppercase">Comms Link</a>
-        </footer>
+        <footer className="mt-10 mb-6 flex gap-6 justify-center flex-wrap">
+    <button onClick={() => setView('privacy')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Privacy</button>
+    <button onClick={() => setView('refund')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Refund Policy</button>
+    {/* ✅ الزر الجديد */}
+    <button onClick={() => setView('terms')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Terms & Conditions</button>
+    <a href="mailto:support@flowcraftco.com" className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Support</a>
+</footer>
+
       </div>
     );
   }
