@@ -498,63 +498,90 @@ export default function FlowCraftLang() {
             </div>
         )}
 
-        <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
-          {/* Chat Card */}
+                <div className="grid md:grid-cols-2 gap-6 max-w-4xl w-full">
+          
+          {/* ✅ 1. Chat Mode Card */}
           <button 
             onClick={() => {
                 if (canEnterChat) enterMode('chat');
             }}
             disabled={!canEnterChat} 
-            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${canEnterChat ? 'bg-[#1e293b]/50 border-2 border-anime-primary/50 hover:border-anime-primary hover:shadow-[0_0_30px_rgba(56,189,248,0.3)] cursor-pointer' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80 cursor-not-allowed'}`}
+            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${
+                canEnterChat 
+                ? 'bg-[#1e293b]/50 border-2 border-anime-primary/50 hover:border-anime-primary hover:shadow-[0_0_30px_rgba(56,189,248,0.3)] cursor-pointer' 
+                : 'bg-gray-900/50 border border-white/5 grayscale opacity-80 cursor-not-allowed'
+            }`}
           >
              <div className="absolute inset-0 bg-gradient-to-br from-anime-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"/>
              <MessageCircle size={48} className="text-anime-primary mb-4" />
              <h2 className="text-3xl font-manga mb-2 text-white">Free Chat</h2>
-             <p className="text-gray-400">Roleplay with AI Sensei. Talk about Anime, Manga, and Life.</p>
+             <p className="text-gray-400 max-w-[80%]">Roleplay with AI Sensei. Talk about Anime, Manga, and Life.</p>
              
-             {isFree && limitReached && (
-                <div className="absolute top-6 right-6">
-                    <Lock className="text-red-500 drop-shadow-lg" size={28} />
-                </div>
-             )}
-             
+             {/* 🛑 أزرار الشراء (تظهر فقط إذا كان المستخدم مجانياً) */}
              {isFree && (
-                <div className="absolute bottom-6 right-6 z-20">
-                    <div onClick={(e) => { e.stopPropagation(); handleCryptoUpgrade('chat'); }} className="bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 text-xs font-bold text-white px-4 py-2 rounded-lg cursor-pointer transition">
-                        Unlock ({billingCycle === 'monthly' ? '$10' : '$84'})
+                <div className="absolute top-6 right-6 flex flex-col items-end gap-2 z-20">
+                    {/* القفل يظهر فقط إذا انتهى الرصيد */}
+                    {limitReached && <Lock className="text-red-500 drop-shadow-lg mb-1" size={24} />}
+                    
+                    {/* زر البطاقة */}
+                    <div 
+                        onClick={(e) => { e.stopPropagation(); handleWhopUpgrade('chat'); }} 
+                        className="bg-white hover:bg-gray-200 text-black text-xs font-black px-3 py-1.5 rounded-lg cursor-pointer transition shadow-lg border border-white flex items-center gap-1"
+                    >
+                        💳 {partialPrice}
+                    </div>
+
+                    {/* زر الكريبتو */}
+                    <div 
+                        onClick={(e) => { e.stopPropagation(); handleCryptoUpgrade('chat'); }} 
+                        className="bg-gray-800 hover:bg-gray-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition border border-white/20 flex items-center gap-1"
+                    >
+                        <Star size={10} fill="white"/> Crypto
                     </div>
                 </div>
-             )}
+             )} 
           </button>
 
-          {/* Lessons Card */}
+          {/* ✅ 2. Lessons Card */}
           <button 
-            onClick={() => {
-                if (canEnterLessons) enterMode('lessons');
-            }}
+            onClick={() => { if (canEnterLessons) enterMode('lessons'); }}
             disabled={!canEnterLessons}
-            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${canEnterLessons ? 'bg-[#1e293b]/50 border-2 border-anime-accent/50 hover:border-anime-accent hover:shadow-[0_0_30px_rgba(244,114,182,0.3)] cursor-pointer' : 'bg-gray-900/50 border border-white/5 grayscale opacity-80 cursor-not-allowed'}`}
+            className={`group relative p-8 rounded-3xl text-left overflow-hidden transition-all duration-300 hover:-translate-y-2 ${
+                canEnterLessons 
+                ? 'bg-[#1e293b]/50 border-2 border-anime-accent/50 hover:border-anime-accent hover:shadow-[0_0_30px_rgba(244,114,182,0.3)] cursor-pointer' 
+                : 'bg-gray-900/50 border border-white/5 grayscale opacity-80 cursor-not-allowed'
+            }`}
           >
              <div className="absolute inset-0 bg-gradient-to-br from-anime-accent/10 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"/>
              <BookOpen size={48} className="text-anime-accent mb-4" />
              <h2 className="text-3xl font-manga mb-2 text-white">The Path</h2>
-             <p className="text-gray-400">Structured Ninja curriculum. From Genin basics to Kage fluency.</p>
+             <p className="text-gray-400 max-w-[80%]">Structured Ninja curriculum. From Genin basics to Kage fluency.</p>
              
-             {isFree && limitReached && (
-                <div className="absolute top-6 right-6">
-                    <Lock className="text-red-500 drop-shadow-lg" size={28} />
-                </div>
-             )}
-
+             {/* 🛑 أزرار الشراء */}
              {isFree && (
-                <div className="absolute bottom-6 right-6 z-20">
-                    <div onClick={(e) => { e.stopPropagation(); handleCryptoUpgrade('lessons'); }} className="bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 text-xs font-bold text-white px-4 py-2 rounded-lg cursor-pointer transition">
-                        Unlock ({billingCycle === 'monthly' ? '$10' : '$84'})
+                <div className="absolute top-6 right-6 flex flex-col items-end gap-2 z-20">
+                    {limitReached && <Lock className="text-red-500 drop-shadow-lg mb-1" size={24} />}
+
+                    {/* زر البطاقة */}
+                    <div 
+                        onClick={(e) => { e.stopPropagation(); handleWhopUpgrade('lessons'); }} 
+                        className="bg-white hover:bg-gray-200 text-black text-xs font-black px-3 py-1.5 rounded-lg cursor-pointer transition shadow-lg border border-white flex items-center gap-1"
+                    >
+                        💳 {partialPrice}
+                    </div>
+
+                    {/* زر الكريبتو */}
+                    <div 
+                        onClick={(e) => { e.stopPropagation(); handleCryptoUpgrade('lessons'); }} 
+                        className="bg-gray-800 hover:bg-gray-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition border border-white/20 flex items-center gap-1"
+                    >
+                        <Star size={10} fill="white"/> Crypto
                     </div>
                 </div>
-             )}
+             )} 
           </button>
         </div>
+
         
         <button onClick={handleLogout} className="mt-12 text-neon-red text-sm flex gap-2 items-center font-bold tracking-wide transition"><LogOut size={18} className="drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]"/> ABORT MISSION (LOG OUT)</button>
         <footer className="mt-10 mb-6 flex gap-6 justify-center flex-wrap">
