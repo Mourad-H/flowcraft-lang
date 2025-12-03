@@ -475,9 +475,26 @@ export default function FlowCraftLang() {
                         {limitReached ? "Your chakra is depleted. Upgrade to recharge immediately." : `You have ${messagesLeft} energy points left for today.`}
                     </p>
                 </div>
-                <button onClick={() => handleCryptoUpgrade('premium')} className="bg-anime-warning text-black font-black px-8 py-3 rounded-xl hover:scale-105 active:scale-95 transition shadow-[0_0_20px_#facc15] flex items-center gap-2">
-                    <Star size={20} fill="black"/> UNLOCK ALL ({billingCycle === 'monthly' ? '$17' : '$140'})
-                </button>
+                                {/* 👇👇 بداية التغيير: أزرار الدفع المزدوجة 👇👇 */}
+                <div className="flex flex-col sm:flex-row gap-3 mt-2">
+                    {/* زر البطاقة (Whop) */}
+                    <button 
+                        onClick={() => handleWhopUpgrade('premium')} 
+                        className="bg-white text-black font-black px-6 py-3 rounded-xl hover:scale-105 transition flex items-center gap-2 shadow-lg border-2 border-white"
+                    >
+                        <span>💳 Card ({billingCycle === 'monthly' ? '$17' : '$140'})</span>
+                    </button>
+
+                    {/* زر الكريبتو (NowPayments) */}
+                    <button 
+                        onClick={() => handleCryptoUpgrade('premium')} 
+                        className="bg-anime-warning text-black font-black px-6 py-3 rounded-xl hover:scale-105 transition shadow-[0_0_20px_#facc15] flex items-center gap-2"
+                    >
+                        <Star size={20} fill="black"/> Crypto ({billingCycle === 'monthly' ? '$17' : '$140'})
+                    </button>
+                </div>
+                {/* 👆👆 نهاية التغيير 👆👆 */}
+
             </div>
         )}
 
