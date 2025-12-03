@@ -282,6 +282,44 @@ export default function FlowCraftLang() {
     } finally { setLoading(false); }
   };
 
+  // ✅ دالة الدفع بالبطاقة (Whop) - نسخة تدعم الشهري والسنوي
+  const handleWhopUpgrade = (tier) => {
+    if (!session?.user?.email) {
+       alert("Please log in first.");
+       return;
+    }
+
+    // 🔗 مصفوفة الروابط: ضع هنا روابط منتجاتك الستة من Whop
+    const links = {
+        'premium': {
+            'monthly': 'https://whop.com/checkout/plan_mhzJodBgxCYvC',
+            'yearly':  'https://whop.com/checkout/plan_jhe2zs8mpcYln'
+        },
+        'chat': {
+            'monthly': 'https://whop.com/checkout/plan_Pumz63iLKXM2Y',
+            'yearly':  'https://whop.com/checkout/plan_Pw1pV1Pz86Tmb'
+        },
+        'lessons': {
+            'monthly': 'https://whop.com/checkout/plan_5X71yFNGwgkNd',
+            'yearly':  'https://whop.com/checkout/plan_LcSriFAQcy48M'
+        }
+    };
+
+    // اختيار الرابط المناسب بناءً على الباقة (tier) والدورة المختارة (billingCycle)
+    // ملاحظة: billingCycle هو المتغير الذي يتغير عند ضغط زر Monthly/Yearly في الأعلى
+    const selectedLink = links[tier]?.[billingCycle];
+
+    if (!selectedLink) {
+        alert("Checkout link not found for this plan.");
+        return;
+    }
+
+    // التوجيه للدفع مع تمرير الإيميل
+    window.location.href = `${selectedLink}?email=${session.user.email}`;
+  };
+
+
+
     // ==========================================
   // 3. EFFECTS (With Safety Valve 🛡️)
   // ==========================================
