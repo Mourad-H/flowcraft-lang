@@ -448,6 +448,8 @@ export default function FlowCraftLang() {
     const limitReached = isFree && msgCount >= 10;
     const canEnterChat = (userTier === 'premium' || userTier === 'chat') || (isFree && !limitReached);
     const canEnterLessons = (userTier === 'premium' || userTier === 'lessons') || (isFree && !limitReached);
+     const currentPrice = billingCycle === 'monthly' ? '$17' : '$140';
+    const partialPrice = billingCycle === 'monthly' ? '$10' : '$84'; 
 
     return (
       <div className="min-h-screen bg-[#050505] anime-grid-bg text-white p-6 flex flex-col items-center justify-center">
