@@ -188,7 +188,8 @@ export default function FlowCraftLang() {
     parts.forEach((part, index) => {
         if (!part.trim()) return; 
 
-        const utterance = new SpeechSynthesisUtterance(part);
+        const endMark = isJapanese ? "。" : ". "; 
+        const utterance = new SpeechSynthesisUtterance(part.trim() + endMark);
         
         // الاندكس الفردي (داخل {{ }}) = ياباني
         // الاندكس الزوجي (خارج {{ }}) = إنجليزي
