@@ -6,7 +6,7 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !process.e
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
-// ✅ THE CURRICULUM
+// ✅ المنهج الدراسي (لا تحذفه)
 const CURRICULUM = {
     1: { title: "The First Meeting", topic: "Basic Greetings (Ohayou, Konnichiwa)", context: "Anime School Life", type: "TEACH" },
     2: { title: "Who Am I?", topic: "Self Introduction (Watashi wa... desu)", context: "Shonen Protagonist Intro", type: "TEACH" },
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     const { messages, mode, userId, lessonId } = req.body
     if (!userId) return res.status(401).json({ error: "USER_ID_MISSING" });
 
-    // 1. SUBSCRIPTION CHECK
+    // 1. SUBSCRIPTION & LIMITS (منطق الـ 10 رسائل المجانية)
     const { data: user } = await supabase.from('users').select('subscription_status, subscription_ends_at').eq('id', userId).single();
     if (user && user.subscription_ends_at && new Date(user.subscription_ends_at) < new Date()) {
         await supabase.from('users').update({ subscription_status: 'expired' }).eq('id', userId);
@@ -38,69 +38,61 @@ export default async function handler(req, res) {
 
     if (subscriptionStatus !== 'active') {
         const DAILY_LIMIT = 10; 
-        const today = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate())).toISOString(); 
+        const now = new Date();
+        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString(); 
         const { count } = await supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', today).eq('role', 'user'); 
         if (count >= DAILY_LIMIT) return res.status(403).json({ error: "LIMIT_EXCEEDED" });
     }
 
+    // 2. LOGGING
     const lastMessage = messages[messages.length - 1];
     if (lastMessage && lastMessage.role === 'user') {
         await supabase.from('conversations').insert({ user_id: userId, role: 'user', content: lastMessage.content, mode: mode });
     }
 
-    // 2. PROMPT ENGINEERING (UNIFIED & FIXED) 🔧
+    // 🛑 3. PROMPT ENGINEERING (الحل الموحد) 🛑
     let systemPrompt = "";
     
-    // قواعد الصوت العامة
-    const commonRules = `
-    AUDIO RULES: Use Japanese punctuation (、 。) for pauses within Japanese text.
-    `;
-
-    // ✅ التنسيق الموحد الصارم (يحل مشكلة الالتصاق)
-    // نضع فاصلة "," بعد القوس لكي يتوقف الصوت قليلاً
-    const STRICT_FORMAT_RULES = `
-    🛑 STRICT FORMATTING (FOLLOW EXACTLY):
-    1. Wrap Japanese script (Kanji/Kana) in double curly braces: {{ 日本語 }}
-    2. ALWAYS put a COMMA after the closing brace, then the Romaji in brackets.
-    3. CORRECT FORMAT: {{ 日本語 }} , (Romaji)
-    4. Example: "Say {{ こんにちは }} , (Konnichiwa)."
-    5. NEVER put English/Romaji inside the {{ }} brackets.
+    // هذه القواعد ستطبق على الشات والدروس معاً لمنع اللخبطة
+    const SHARED_RULES = `
+    CRITICAL OUTPUT RULES:
+    1. ALWAYS use Japanese Script (Kanji/Kana) for Japanese words.
+    2. WRAP all Japanese Script inside double curly braces: {{ 日本語 }}.
+    3. Put the Romaji reading next to it in standard parentheses: (Romaji).
+    4. CORRECT FORMAT: "The word is {{ こんにちは }} (Konnichiwa)."
+    5. NEVER put Romaji inside {{ }}.
+    6. NEVER write Japanese without {{ }}.
     `;
 
     if (mode === 'chat') {
       systemPrompt = `You are "FlowSensei", an Anime Japanese tutor.
-      ${commonRules}
       ROLE: Friendly Rival / Senpai.
+      GOAL: Chat freely about anime.
       
-      🛑 STRICT OUTPUT FORMAT (CRITICAL):
-      1. You MUST use Japanese Script (Kanji/Kana) for ALL Japanese phrases.
-      2. Wrap the Japanese Script inside {{ }}.
-      3. Follow it with Romaji in ( ).
+      ${SHARED_RULES}
       
-      ✅ CORRECT: "You are {{ 強い }} (Tsuyoi)!"
-      ❌ WRONG: "You are Tsuyoi (Tsuyoi)!"
-      ❌ WRONG: "You are {{ Tsuyoi }} (Tsuyoi)!"
-      
-      - If you write Japanese in English letters (Romaji) inside {{ }}, you fail.
-      - Always convert to Kanji/Hiragana/Katakana inside {{ }}.
+      - Reply mainly in English but mix in Japanese phrases using the format above.
+      - Use emojis like 🎌, ⚔️.
       `;
-    }
+    } 
     else if (mode === 'lessons') {
       const lessonData = CURRICULUM[lessonId] || { title: "Advanced", topic: "Free Talk", type: "TEACH", context: "Mastery" };
       
       if (lessonData.type === 'EXAM') {
           systemPrompt = `You are the PROCTOR.
-          ${commonRules}
-          ${STRICT_FORMAT_RULES}
           CONTEXT: ${lessonData.context}. GOAL: Test on ${lessonData.topic}.
-          RULES: Ask 3 questions. Use the format above. If pass: "[EXAM_PASSED]".
+          
+          ${SHARED_RULES}
+          
+          RULES: Ask 3 questions. If pass: "[EXAM_PASSED]".
           `;
       } else {
           systemPrompt = `You are Sensei teaching Lesson ${lessonId}: "${lessonData.title}".
-          ${commonRules}
-          ${STRICT_FORMAT_RULES}
           TOPIC: ${lessonData.topic}.
-          INSTRUCTIONS: Explain topic. Give examples using: {{ Kanji }} , (Romaji).
+          
+          ${SHARED_RULES}
+          
+          INSTRUCTIONS: Explain topic. Give examples using the format above.
           GATEKEEPING: If correct, end with: "[LESSON_COMPLETE]".
           `;
       }
@@ -114,7 +106,6 @@ export default async function handler(req, res) {
     
     const data = await response.json()
     if (data.error) throw new Error(`Groq API Error: ${data.error.message}`);
-
     const aiResponseContent = data.choices[0].message.content;
 
     await supabase.from('conversations').insert({ user_id: userId, role: 'assistant', content: aiResponseContent, mode: mode, tokens_used: data.usage?.total_tokens || 0 });
