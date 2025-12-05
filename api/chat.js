@@ -6,7 +6,6 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !process.e
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
-// ✅ المنهج الدراسي (لا تحذفه)
 const CURRICULUM = {
     1: { title: "The First Meeting", topic: "Basic Greetings (Ohayou, Konnichiwa)", context: "Anime School Life", type: "TEACH" },
     2: { title: "Who Am I?", topic: "Self Introduction (Watashi wa... desu)", context: "Shonen Protagonist Intro", type: "TEACH" },
@@ -29,7 +28,7 @@ export default async function handler(req, res) {
     const { messages, mode, userId, lessonId } = req.body
     if (!userId) return res.status(401).json({ error: "USER_ID_MISSING" });
 
-    // 1. SUBSCRIPTION & LIMITS (منطق الـ 10 رسائل المجانية)
+    // 1. SUBSCRIPTION & LIMITS
     const { data: user } = await supabase.from('users').select('subscription_status, subscription_ends_at').eq('id', userId).single();
     if (user && user.subscription_ends_at && new Date(user.subscription_ends_at) < new Date()) {
         await supabase.from('users').update({ subscription_status: 'expired' }).eq('id', userId);
@@ -50,61 +49,51 @@ export default async function handler(req, res) {
         await supabase.from('conversations').insert({ user_id: userId, role: 'user', content: lastMessage.content, mode: mode });
     }
 
-    // 🛑 3. PROMPT ENGINEERING (الحل الموحد) 🛑
+    // 3. PROMPT ENGINEERING
     let systemPrompt = "";
     
-    // هذه القواعد ستطبق على الشات والدروس معاً لمنع اللخبطة
-    const SHARED_RULES = `
-    CRITICAL OUTPUT RULES:
-    1. ALWAYS use Japanese Script (Kanji/Kana) for Japanese words.
-    2. WRAP all Japanese Script inside double curly braces: {{ 日本語 }}.
-    3. Put the Romaji reading next to it in standard parentheses: (Romaji).
-    4. CORRECT FORMAT: "The word is {{ こんにちは }} (Konnichiwa)."
-    5. NEVER put Romaji inside {{ }}.
-    6. NEVER write Japanese without {{ }}.
+    // ✅✅✅ تعريف المتغير المفقود هنا لتجنب الخطأ ✅✅✅
+    const commonRules = `
+    AUDIO RULES: Use Japanese punctuation (、 。) for pauses within Japanese text.
+    `;
+
+    // قواعد التنسيق الصارمة (مشتركة)
+    const STRICT_FORMAT = `
+    🛑 CRITICAL AUDIO FORMATTING RULES (DO NOT IGNORE):
+    1. Inside the double brackets {{ }}, you must WRITE ONLY JAPANESE SCRIPT (Kanji/Kana).
+    2. NEVER write Romaji or English inside {{ }}.
+    3. Romaji must go OUTSIDE and AFTER the brackets in parentheses.
+    
+    ✅ CORRECT: "{{ こんにちは }} (Konnichiwa)"
+    ❌ WRONG: "{{ Konnichiwa }}"
+    ❌ WRONG: "{{ Konnichiwa (Hello) }}"
+    
+    If you break this rule, the audio engine will fail.
     `;
 
     if (mode === 'chat') {
       systemPrompt = `You are "FlowSensei", an Anime Japanese tutor.
+      ${commonRules}
+      ${STRICT_FORMAT}
+      
       ROLE: Friendly Rival / Senpai.
-      GOAL: Chat freely about anime.
+      GOAL: Chat about anime while teaching.
       
-      ${SHARED_RULES}
-      
-      - Reply mainly in English but mix in Japanese phrases using the format above.
+      - Reply mainly in English but mix in Japanese phrases naturally using the format above.
       - Use emojis like 🎌, ⚔️.
       `;
     } 
-        // 🔴 مود الدروس (تحديث الصرامة)
     else if (mode === 'lessons') {
       const lessonData = CURRICULUM[lessonId] || { title: "Advanced", topic: "Free Talk", type: "TEACH", context: "Mastery" };
       
-      // ✅ القواعد الصارمة الموحدة (نفس صرامة الشات)
-      const STRICT_FORMAT = `
-      🛑 CRITICAL AUDIO FORMATTING RULES (DO NOT IGNORE):
-      1. Inside the double brackets {{ }}, you must WRITE ONLY JAPANESE SCRIPT (Kanji/Kana).
-      2. NEVER write Romaji or English inside {{ }}.
-      3. Romaji must go OUTSIDE and AFTER the brackets in parentheses.
-      
-      ✅ CORRECT: "{{ こんにちは }} (Konnichiwa)"
-      ❌ WRONG: "{{ Konnichiwa }}"
-      ❌ WRONG: "{{ Konnichiwa (Hello) }}"
-      
-      If you break this rule, the audio engine will fail.
-      `;
-
       if (lessonData.type === 'EXAM') {
-          systemPrompt = `You are the PROCTOR of the ${lessonData.title}.
+          systemPrompt = `You are the PROCTOR.
           ${commonRules}
           ${STRICT_FORMAT}
           
-          CONTEXT: ${lessonData.context}. 
-          GOAL: Test the user on: ${lessonData.topic}.
+          CONTEXT: ${lessonData.context}. GOAL: Test on ${lessonData.topic}.
           
-          RULES: 
-          - Ask 3 distinct questions. 
-          - ALWAYS use the {{ Japanese }} format for any Japanese word.
-          - Only if they pass all 3, end with: "[EXAM_PASSED]".
+          RULES: Ask 3 questions. Use the format above. If pass: "[EXAM_PASSED]".
           `;
       } else {
           systemPrompt = `You are Sensei teaching Lesson ${lessonId}: "${lessonData.title}".
@@ -112,16 +101,11 @@ export default async function handler(req, res) {
           ${STRICT_FORMAT}
           
           TOPIC: ${lessonData.topic}.
-          CONTEXT: ${lessonData.context}.
-          
-          INSTRUCTIONS: 
-          - Explain the topic clearly in English.
-          - Give examples using the strict format: {{ Kanji }} (Romaji).
-          - STRICT GATEKEEPING: If correct, end with: "[LESSON_COMPLETE]".
+          INSTRUCTIONS: Explain topic. Give examples using the format above.
+          GATEKEEPING: If correct, end with: "[LESSON_COMPLETE]".
           `;
       }
     }
-
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -131,6 +115,7 @@ export default async function handler(req, res) {
     
     const data = await response.json()
     if (data.error) throw new Error(`Groq API Error: ${data.error.message}`);
+
     const aiResponseContent = data.choices[0].message.content;
 
     await supabase.from('conversations').insert({ user_id: userId, role: 'assistant', content: aiResponseContent, mode: mode, tokens_used: data.usage?.total_tokens || 0 });
