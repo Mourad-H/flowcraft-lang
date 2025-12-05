@@ -1,47 +1,28 @@
 import { createClient } from '@supabase/supabase-js'
 
+// استيراد المكتبة الضخمة
+import { FULL_CURRICULUM } from '../data/curriculumData.js'; // تأكد من المسار الصحيح
+
+
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !process.env.GROQ_API_KEY) {
   throw new Error("MISSING ENV VARIABLES IN VERCEL");
 }
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
-// ============================================================
-// 1. THE CURRICULUM (المنهج الأساسي + المولد التلقائي)
-// ============================================================
-const BASE_CURRICULUM = {
-    // --- ARC 1: THE GENIN BEGINNINGS ---
-    1: { title: "The First Meeting", topic: "Basic Greetings (Ohayou, Konnichiwa)", context: "Anime School Life", type: "TEACH" },
-    2: { title: "Who Am I?", topic: "Self Introduction (Watashi wa... desu)", context: "Shonen Protagonist Intro", type: "TEACH" },
-    3: { title: "Yes, No, Maybe", topic: "Hai, Iie, and basic agreement", context: "Detective Anime Interrogation", type: "TEACH" },
-    4: { title: "Review & Practice", topic: "Review of Lessons 1-3", context: "Training Montage", type: "TEACH" },
-    5: { title: "GENIN EXAM", topic: "Test on Lessons 1-4", context: "Chunin Exam Arena", type: "EXAM" },
-    
-    // --- ARC 2: SCHOOL LIFE ---
-    6: { title: "The Object", topic: "Kore, Sore, Are (This, That)", context: "Shopping in Akihabara", type: "TEACH" },
-    7: { title: "Existence", topic: "Imasu / Arimasu (Living vs Non-living)", context: "Searching for a villain", type: "TEACH" },
-    8: { title: "School Titles", topic: "Senpai, Kouhai, Sensei", context: "High School Drama", type: "TEACH" },
-    9: { title: "Time", topic: "Ima nanji desu ka?", context: "Running late for school", type: "TEACH" },
-    10: { title: "Midterms", topic: "Review Lessons 6-9", context: "School Midterm Exams", type: "EXAM" },
 
-    // --- ARC 3: BATTLE MODE ---
-    11: { title: "Power Verbs", topic: "Taberu, Iku, Tatakau (Dict form)", context: "Planning a battle", type: "TEACH" },
-    12: { title: "Destinations", topic: "Particle 'Ni' (To go to...)", context: "Heading to the dungeon", type: "TEACH" },
-    13: { title: "Objects of Action", topic: "Particle 'O' (Eat ramen)", context: "Naruto eating Ichiraku Ramen", type: "TEACH" },
-    14: { title: "Command Form", topic: "Nigero! Yame! (Run/Stop)", context: "Giving orders in battle", type: "TEACH" },
-    15: { title: "Chunin Exam", topic: "Review Lessons 11-14", context: "Forest of Death", type: "EXAM" },
-};
-
-// ✅ دالة ذكية لتوليد الدروس حتى 100+ إذا لم تكن في القائمة
+// دالة البحث في المكتبة الضخمة
 const getLesson = (id) => {
-    if (BASE_CURRICULUM[id]) return BASE_CURRICULUM[id];
+    // 1. البحث في الـ 500 درس الجاهزة
+    if (FULL_CURRICULUM[id]) return FULL_CURRICULUM[id];
     
-    // توليد تلقائي للمستويات المتقدمة
+    // 2. إذا انتهت الـ 500 (للمستقبل البعيد)، ولد درس عشوائي
     if (id % 5 === 0) {
-        return { title: `Rank ${id} Exam`, topic: `Mastery Test for Level ${id}`, context: "Kage Level Assessment", type: "EXAM" };
+        return { title: `Rank S Exam (Level ${id})`, topic: `Mastery Test`, context: "Kage Level", type: "EXAM" };
     }
-    return { title: `Level ${id} Training`, topic: "Advanced Anime Grammar & Vocabulary", context: "Advanced Arc", type: "TEACH" };
+    return { title: `Level ${id} Training`, topic: "Advanced Immersion", context: "Infinite Arc", type: "TEACH" };
 };
+
 
 export default async function handler(req, res) {
   // --- CORS ---
