@@ -75,9 +75,15 @@ export default async function handler(req, res) {
       
       ${STRICT_FORMAT_RULES}
       
+      🛑 CRITICAL RULE FOR CHAT:
+      1. Inside {{ double braces }}, you must ONLY use Japanese characters (Kanji/Kana).
+      2. NEVER write English letters or Romaji inside {{ }}.
+      3. WRONG: "{{ Arigatou }} , (Arigatou)"
+      4. RIGHT: "{{ ありがとう }} , (Arigatou)"
+      
       - Reply mainly in English but mix in Japanese phrases naturally using the format above.
       `;
-    } 
+    }
     else if (mode === 'lessons') {
       const lessonData = CURRICULUM[lessonId] || { title: "Advanced", topic: "Free Talk", type: "TEACH", context: "Mastery" };
       
