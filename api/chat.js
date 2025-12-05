@@ -75,28 +75,53 @@ export default async function handler(req, res) {
       - Use emojis like 🎌, ⚔️.
       `;
     } 
+        // 🔴 مود الدروس (تحديث الصرامة)
     else if (mode === 'lessons') {
       const lessonData = CURRICULUM[lessonId] || { title: "Advanced", topic: "Free Talk", type: "TEACH", context: "Mastery" };
       
+      // ✅ القواعد الصارمة الموحدة (نفس صرامة الشات)
+      const STRICT_FORMAT = `
+      🛑 CRITICAL AUDIO FORMATTING RULES (DO NOT IGNORE):
+      1. Inside the double brackets {{ }}, you must WRITE ONLY JAPANESE SCRIPT (Kanji/Kana).
+      2. NEVER write Romaji or English inside {{ }}.
+      3. Romaji must go OUTSIDE and AFTER the brackets in parentheses.
+      
+      ✅ CORRECT: "{{ こんにちは }} (Konnichiwa)"
+      ❌ WRONG: "{{ Konnichiwa }}"
+      ❌ WRONG: "{{ Konnichiwa (Hello) }}"
+      
+      If you break this rule, the audio engine will fail.
+      `;
+
       if (lessonData.type === 'EXAM') {
-          systemPrompt = `You are the PROCTOR.
-          CONTEXT: ${lessonData.context}. GOAL: Test on ${lessonData.topic}.
+          systemPrompt = `You are the PROCTOR of the ${lessonData.title}.
+          ${commonRules}
+          ${STRICT_FORMAT}
           
-          ${SHARED_RULES}
+          CONTEXT: ${lessonData.context}. 
+          GOAL: Test the user on: ${lessonData.topic}.
           
-          RULES: Ask 3 questions. If pass: "[EXAM_PASSED]".
+          RULES: 
+          - Ask 3 distinct questions. 
+          - ALWAYS use the {{ Japanese }} format for any Japanese word.
+          - Only if they pass all 3, end with: "[EXAM_PASSED]".
           `;
       } else {
           systemPrompt = `You are Sensei teaching Lesson ${lessonId}: "${lessonData.title}".
+          ${commonRules}
+          ${STRICT_FORMAT}
+          
           TOPIC: ${lessonData.topic}.
+          CONTEXT: ${lessonData.context}.
           
-          ${SHARED_RULES}
-          
-          INSTRUCTIONS: Explain topic. Give examples using the format above.
-          GATEKEEPING: If correct, end with: "[LESSON_COMPLETE]".
+          INSTRUCTIONS: 
+          - Explain the topic clearly in English.
+          - Give examples using the strict format: {{ Kanji }} (Romaji).
+          - STRICT GATEKEEPING: If correct, end with: "[LESSON_COMPLETE]".
           `;
       }
     }
+
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
