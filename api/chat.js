@@ -66,73 +66,59 @@ export default async function handler(req, res) {
 
     // --- 4. PROMPT ENGINEERING (STRICT & UNIFIED) ---
     let systemPrompt = "";
-    
-    // ✅ تعريف القواعد العامة (لتفادي خطأ undefined)
-    const commonRules = `
-    AUDIO RULES: Use Japanese punctuation (、 。) for pauses within Japanese text.
-    `;
+    let aiTemperature = 0.7; // القيمة الافتراضية
+    let maxTokens = 600;     // القيمة الافتراضية
 
-    // ✅ الدستور الصارم للكتابة (يطبق على الشات والدروس)
-    const STRICT_FORMAT = `
-    🛑 CRITICAL FORMATTING RULES (DO NOT IGNORE):
-    1. Inside the double brackets {{ }}, you must WRITE ONLY JAPANESE SCRIPT (Kanji/Kana).
-    2. NEVER write Romaji or English inside {{ }}.
-    3. Romaji must go OUTSIDE and AFTER the brackets in parentheses.
-    
-    ✅ CORRECT: "{{ こんにちは }} (Konnichiwa)"
-    ❌ WRONG: "{{ Konnichiwa }}"
-    ❌ WRONG: "{{ Konnichiwa (Hello) }}"
-    
-    If you break this rule, the audio engine will fail.
-    `;
-
+    // 🟢 1. مود الدردشة (الذكاء الأقصى والحرية)
     if (mode === 'chat') {
-      systemPrompt = `You are "FlowSensei", an Anime Japanese tutor.
-      ${commonRules}
-      ${STRICT_FORMAT}
-      
-      ROLE: Friendly Rival / Senpai.
-      GOAL: Chat about anime while teaching.
-      
-      - Reply mainly in English but mix in Japanese phrases naturally using the format above.
-      - Use emojis like 🎌, ⚔️, 🍥.
-      `;
+        aiTemperature = 0.8; // رفعنا الحرارة للإبداع
+        maxTokens = 1000;    // زدنا المساحة لردود أطول وأمتع
+        
+        systemPrompt = `
+        IDENTITY: You are "FlowSensei", a fun, energetic Anime Otaku companion.
+        GOAL: Engage in endless, immersive roleplay conversations about anime, life, and Japan.
+        
+        RULES:
+        1. Use slang, emojis (🎌, 🔥), and anime references constantly.
+        2. Be a "Friendly Rival" - challenge the user playfully.
+        3. Correct their Japanese mistakes GENTLY, then continue the chat.
+        4. ALWAYS wrap Japanese words in {{ }} as per the strict format rules.
+        `;
     } 
-    // ✅ استخدام دالة getLesson لدعم 100 درس
+    
+    // 🔴 2. مود الدروس (الذكاء المحدود - وضع "المصحح الآلي")
     else if (mode === 'lessons') {
-      const lessonData = getLesson(lessonId);
-      
-      if (lessonData.type === 'EXAM') {
-          systemPrompt = `You are the PROCTOR of the ${lessonData.title}.
-          ${commonRules}
-          ${STRICT_FORMAT}
-          
-          CONTEXT: ${lessonData.context}. 
-          GOAL: Test the user on: ${lessonData.topic}.
-          
-          RULES: 
-          - Ask 3 distinct questions one by one.
-          - Only if they pass all 3, end with: "[EXAM_PASSED]".
-          `;
-      } else {
-          systemPrompt = `You are Sensei teaching Lesson ${lessonId}: "${lessonData.title}".
-          ${commonRules}
-          ${STRICT_FORMAT}
-          
-          TOPIC: ${lessonData.topic}.
-          INSTRUCTIONS: 
-          - Explain topic clearly.
-          - Give examples using the strict format: {{ Kanji }} (Romaji).
-          - STRICT GATEKEEPING: If correct, say "Correct!" and IMMEDIATELY end with: "[LESSON_COMPLETE]".
-          `;
-      }
+        const lessonData = CURRICULUM[lessonId]; // جلب البيانات من المكتبة الثابتة
+        aiTemperature = 0.1; // حرارة منخفضة جداً للدقة والصرامة
+        maxTokens = 300;     // تقليل التوكنات لأننا لا نحتاج شرحاً طويلاً
+        
+        // هنا الـ AI لا يشرح، بل يختبر فقط لأن الشرح موجود في الواجهة
+        systemPrompt = `
+        TASK: You are an automated EXAMINER for Lesson ${lessonId}.
+        TOPIC: ${lessonData.topic}.
+        CONTEXT: ${lessonData.context}.
+        
+        YOUR JOB:
+        The user will send a sentence attempting to use the lesson's grammar/vocabulary.
+        1. Check if their Japanese is grammatically correct based on the Topic.
+        2. If CORRECT: Say "Perfect!" and output tag: "[LESSON_COMPLETE]".
+        3. If WRONG: Briefly explain the error (1 sentence) and ask them to try again.
+        
+        DO NOT explain the lesson from scratch. Assume they read the library content.
+        STRICT FORMATTING: Use {{ Kanji }} (Romaji) for all corrections.
+        `;
     }
 
-    // --- 5. CALL AI ---
+    // 3. الاتصال بـ Groq (مع المتغيرات الجديدة)
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'system', content: systemPrompt }, ...messages], temperature: 0.8, max_tokens: 600 })
+      body: JSON.stringify({ 
+          model: 'llama-3.3-70b-versatile', 
+          messages: [{ role: 'system', content: systemPrompt }, ...messages], 
+          temperature: aiTemperature, // ✅ متغير حسب المود
+          max_tokens: maxTokens       // ✅ متغير حسب المود
+      })
     })
     
     const data = await response.json()
