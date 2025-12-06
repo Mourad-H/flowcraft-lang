@@ -94,13 +94,13 @@ export default async function handler(req, res) {
       }
     }
 
-    // 4. CALL DEEPSEEK R1 (THE SUPER SOLDIER) ⚔️
+    // 4. CALL MIXTRAL (THE SUPER SOLDIER) ⚔️
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-          // 🛑 SWAPPING MODEL TO DEEPSEEK
-          model: 'deepseek-r1-distill-llama-70b', 
+          // 🛑 SWAPPING MODEL TO MIXTRAL
+          model: 'model: 'mixtral-8x7b-32768',
           messages: [{ role: 'system', content: systemPrompt }, ...messages], 
           temperature: 0.6, // DeepSeek handles logic better even at 0.6
           max_tokens: 1000 
