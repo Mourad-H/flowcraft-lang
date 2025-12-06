@@ -1,6 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-
-// ✅ استيراد المنهج من الملف الجديد
 import { FULL_CURRICULUM } from '../data/curriculumData.js';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !process.env.GROQ_API_KEY) {
@@ -9,17 +7,10 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !process.e
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
-// ✅ دالة لجلب الدرس بأمان من المكتبة المستوردة
+// دالة جلب الدرس
 const getLessonData = (id) => {
-    // محاولة جلب الدرس من المكتبة الكاملة
-    if (FULL_CURRICULUM && FULL_CURRICULUM[id]) {
-        return FULL_CURRICULUM[id];
-    }
-    
-    // إذا لم يكن موجوداً (للمستقبل)، نولد درساً افتراضياً
-    if (id % 5 === 0) {
-        return { title: `Rank Exam (Level ${id})`, topic: `Mastery Review`, context: "Advanced Trial", type: "EXAM" };
-    }
+    if (FULL_CURRICULUM && FULL_CURRICULUM[id]) return FULL_CURRICULUM[id];
+    if (id % 5 === 0) return { title: `Rank Exam (Level ${id})`, topic: `Mastery Review`, context: "Advanced Trial", type: "EXAM" };
     return { title: `Level ${id} Training`, topic: "Advanced Conversation", context: "Anime World Scenario", type: "TEACH" };
 };
 
@@ -34,7 +25,6 @@ export default async function handler(req, res) {
 
   try {
     const { messages, mode, userId, lessonId } = req.body
-
     if (!userId) return res.status(401).json({ error: "USER_ID_MISSING" });
 
     // 1. SUBSCRIPTION & LIMITS
@@ -60,21 +50,19 @@ export default async function handler(req, res) {
 
     // 3. PROMPT ENGINEERING
     let systemPrompt = "";
-    
-    const commonRules = `
-    AUDIO RULES: Use Japanese punctuation (、 。) for pauses within Japanese text.
-    `;
+    let aiTemperature = 0.7; // افتراضي
+
+    const commonRules = `AUDIO RULES: Use Japanese punctuation (、 。) for pauses.`;
 
     const STRICT_FORMAT = `
-    🛑 CRITICAL OUTPUT RULES (DO NOT IGNORE):
-    1. ALWAYS wrap Japanese script (Kanji/Kana) inside double curly braces: {{ 日本語 }}
-    2. Put Romaji OUTSIDE the braces in parentheses: (Romaji)
-    3. CORRECT: "This is {{ 本 }} (Hon)."
-    4. WRONG: "This is {{ Hon }}."
-    5. WRONG: "This is Hon (Hon)."
+    🛑 FORMATTING RULES:
+    1. WRAP Japanese script in {{ }}: {{ こんにちは }}
+    2. Put Romaji after in ( ): (Konnichiwa)
+    3. NO English/Romaji inside {{ }}.
     `;
 
     if (mode === 'chat') {
+      aiTemperature = 0.8; // 🔥 حرارة عالية للإبداع في الشات
       systemPrompt = `You are "FlowSensei", an Anime Japanese tutor.
       ROLE: Friendly Rival / Senpai.
       GOAL: Chat freely about anime.
@@ -84,29 +72,35 @@ export default async function handler(req, res) {
       `;
     } 
     else if (mode === 'lessons') {
-      // ✅ استخدام الدالة الجديدة التي تعتمد على FULL_CURRICULUM
+      aiTemperature = 0.2; // 🧊 حرارة منخفضة جداً للانضباط في الدروس
       const lessonData = getLessonData(lessonId);
-      
-      // تحضير المحتوى إذا كان موجوداً
-      const contentBlock = lessonData.content 
-        ? `LESSON CONTENT:\n${lessonData.content.join("\n")}` 
-        : "";
+      const contentBlock = lessonData.content ? `LESSON CONTENT:\n${lessonData.content.join("\n")}` : "";
 
       if (lessonData.type === 'EXAM') {
           systemPrompt = `You are the PROCTOR.
           CONTEXT: ${lessonData.context}. GOAL: Test on ${lessonData.topic}.
           ${STRICT_FORMAT}
           ${contentBlock}
-          RULES: Ask 3 questions based on the content. If pass: "[EXAM_PASSED]".
+          
+          RULES: 
+          1. Ask 3 questions based on content.
+          2. IF PASS: Write EXACTLY: "[EXAM_PASSED]" and stop.
+          3. DO NOT write summaries or congratulations speeches.
+          4. DO NOT invent new tags.
           `;
       } else {
           systemPrompt = `You are Sensei teaching Lesson ${lessonId}: "${lessonData.title}".
           TOPIC: ${lessonData.topic}.
           ${STRICT_FORMAT}
           ${contentBlock}
+          
           INSTRUCTIONS: 
-          - Teach using the provided content. 
-          - STRICT GATEKEEPING: If correct, end with: "[LESSON_COMPLETE]".
+          1. Teach using the provided content. 
+          2. STRICT GATEKEEPING: 
+             - Check user answer.
+             - If CORRECT: Say "Correct!" and write EXACTLY: "[LESSON_COMPLETE]".
+             - DO NOT write anything else after the tag.
+             - DO NOT give a speech.
           `;
       }
     }
@@ -118,7 +112,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({ 
           model: 'llama-3.3-70b-versatile', 
           messages: [{ role: 'system', content: systemPrompt }, ...messages], 
-          temperature: 0.5, 
+          temperature: aiTemperature, // ✅ استخدام الحرارة المتغيرة
           max_tokens: 600 
       })
     })
