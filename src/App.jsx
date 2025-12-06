@@ -623,7 +623,44 @@ export default function FlowCraftLang() {
               {mode === 'lessons' && (
                   <div className="flex gap-2 ml-4">
                       <button onClick={() => { setMessages([]); setCurrentLesson(prev => Math.max(1, prev - 1)); }} disabled={currentLesson === 1} className="p-2 bg-white/10 rounded hover:bg-white/20 disabled:opacity-30 transition">← Prev</button>
-                      <button onClick={() => { setMessages([]); setCurrentLesson(prev => prev + 1); }} disabled={currentLesson >= maxLesson} className="p-2 bg-anime-primary text-black rounded font-bold hover:bg-cyan-400 disabled:opacity-30 disabled:bg-gray-600 disabled:text-gray-400 transition">Next →</button>
+                      <button 
+    onClick={() => {
+        setMessages([]); // 1. تنظيف الشاشة
+        const nextLessonId = currentLesson + 1;
+        setCurrentLesson(nextLessonId); // 2. تغيير الرقم محلياً
+        
+        // 3. 🔥 الإضافة المهمة: إرسال "نكزة" للسيرفر ليبدأ الدرس فوراً
+        setLoading(true);
+        fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages: [{ role: 'user', content: "START_LESSON" }], // إشارة البدء
+                mode: 'lessons',
+                lessonId: nextLessonId,
+                userId: session?.user?.id
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            // عرض رد المعلم (شرح الدرس) فوراً
+            setMessages([{ role: 'assistant', content: data.message }]);
+            speak(data.message);
+            setLoading(false);
+        })
+        .catch(err => {
+            console.error(err);
+            setLoading(false);
+        });
+    }}
+    
+    // ... بقية الخصائص كما هي ...
+    disabled={currentLesson >= maxLesson}
+    className="p-2 bg-anime-primary text-black rounded font-bold hover:bg-cyan-400 disabled:opacity-30 disabled:bg-gray-600 disabled:text-gray-400 transition"
+>
+    Next →
+</button>
+
                   </div>
               )}
           </div>
