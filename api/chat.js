@@ -7,7 +7,7 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !process.e
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
-// Helper to get lesson
+// دالة جلب الدرس
 const getLessonData = (id) => {
     if (FULL_CURRICULUM && FULL_CURRICULUM[id]) return FULL_CURRICULUM[id];
     if (id % 5 === 0) return { title: `Rank Exam (Level ${id})`, topic: `Mastery Review`, context: "Advanced Trial", type: "EXAM" };
@@ -15,7 +15,6 @@ const getLessonData = (id) => {
 };
 
 export default async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Credentials', true)
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
@@ -28,7 +27,7 @@ export default async function handler(req, res) {
     const { messages, mode, userId, lessonId } = req.body
     if (!userId) return res.status(401).json({ error: "USER_ID_MISSING" });
 
-    // 1. SUBSCRIPTION CHECK
+    // 1. SUBSCRIPTION & LIMITS
     const { data: user } = await supabase.from('users').select('subscription_status, subscription_ends_at').eq('id', userId).single();
     if (user && user.subscription_ends_at && new Date(user.subscription_ends_at) < new Date()) {
         await supabase.from('users').update({ subscription_status: 'expired' }).eq('id', userId);
@@ -49,74 +48,79 @@ export default async function handler(req, res) {
         await supabase.from('conversations').insert({ user_id: userId, role: 'user', content: lastMessage.content, mode: mode });
     }
 
-    // 3. SUPER SOLDIER PROMPTS 🧠
+    // 3. PROMPT ENGINEERING
     let systemPrompt = "";
-    
-    // DeepSeek loves explicit, logical rules.
+    let aiTemperature = 0.7; // افتراضي
+
+    const commonRules = `AUDIO RULES: Use Japanese punctuation (、 。) for pauses.`;
+
     const STRICT_FORMAT = `
-    [SYSTEM MANDATE]:
-    1. You MUST include Japanese text in every response.
-    2. Japanese text MUST be written in native script (Kanji/Kana).
-    3. Japanese text MUST be wrapped in {{ }} braces.
-    4. Romaji MUST be in ( ) parentheses OUTSIDE the braces.
-    
-    CORRECT PATTERN: "Hello is {{ こんにちは }} (Konnichiwa)."
-    FAILURE PATTERN: "Hello is Konnichiwa."
+    🛑 FORMATTING RULES:
+    1. WRAP Japanese script in {{ }}: {{ こんにちは }}
+    2. Put Romaji after in ( ): (Konnichiwa)
+    3. NO English/Romaji inside {{ }}.
     `;
 
     if (mode === 'chat') {
-      systemPrompt = `You are "FlowSensei".
+      aiTemperature = 0.8; // 🔥 حرارة عالية للإبداع في الشات
+      systemPrompt = `You are "FlowSensei", an Anime Japanese tutor.
+      ROLE: Friendly Rival / Senpai.
+      GOAL: Chat freely about anime.
       ${STRICT_FORMAT}
-      ROLE: Friendly Anime Rival.
-      GOAL: Chat fun.
-      - Reply in English but inject Japanese using the PATTERN above.
-      - Use emojis: 🎌, ⚔️.
+      - Use Japanese phrases naturally.
+      - Use emojis: 🎌, ⚔️, 🍥.
       `;
     } 
     else if (mode === 'lessons') {
+      aiTemperature = 0.2; // 🧊 حرارة منخفضة جداً للانضباط في الدروس
       const lessonData = getLessonData(lessonId);
-      const contentBlock = lessonData.content ? `SOURCE MATERIAL:\n${lessonData.content.join("\n")}` : "";
+      const contentBlock = lessonData.content ? `LESSON CONTENT:\n${lessonData.content.join("\n")}` : "";
 
       if (lessonData.type === 'EXAM') {
           systemPrompt = `You are the PROCTOR.
+          CONTEXT: ${lessonData.context}. GOAL: Test on ${lessonData.topic}.
           ${STRICT_FORMAT}
           ${contentBlock}
-          TASK: Ask 3 questions based on SOURCE MATERIAL.
-          PASS CONDITION: If user answers 3 correctly, output ONLY: "[EXAM_PASSED]".
+          
+          RULES: 
+          1. Ask 3 questions based on content.
+          2. IF PASS: Write EXACTLY: "[EXAM_PASSED]" and stop.
+          3. DO NOT write summaries or congratulations speeches.
+          4. DO NOT invent new tags.
           `;
       } else {
-          systemPrompt = `You are Sensei. Lesson: ${lessonData.title}.
+          systemPrompt = `You are Sensei teaching Lesson ${lessonId}: "${lessonData.title}".
+          TOPIC: ${lessonData.topic}.
           ${STRICT_FORMAT}
           ${contentBlock}
-          TASK: Teach the SOURCE MATERIAL.
-          GATEKEEPING: Ask user to repeat/translate. If correct, output ONLY: "[LESSON_COMPLETE]".
+          
+          INSTRUCTIONS: 
+          1. Teach using the provided content. 
+          2. STRICT GATEKEEPING: 
+             - Check user answer.
+             - If CORRECT: Say "Correct!" and write EXACTLY: "[LESSON_COMPLETE]".
+             - DO NOT write anything else after the tag.
+             - DO NOT give a speech.
           `;
       }
     }
 
-    // 4. CALL MIXTRAL (THE SUPER SOLDIER) ⚔️
+    // 4. CALL AI
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-          // 🛑 SWAPPING MODEL TO MIXTRAL
-          model: 'model: 'mixtral-8x7b-32768',
+          model: 'llama-3.3-70b-versatile', 
           messages: [{ role: 'system', content: systemPrompt }, ...messages], 
-          temperature: 0.6, // DeepSeek handles logic better even at 0.6
-          max_tokens: 1000 
+          temperature: aiTemperature, // ✅ استخدام الحرارة المتغيرة
+          max_tokens: 600 
       })
     })
     
     const data = await response.json()
     if (data.error) throw new Error(`Groq API Error: ${data.error.message}`);
-    
-    let aiResponseContent = data.choices[0].message.content;
+    const aiResponseContent = data.choices[0].message.content;
 
-    // 🛑 CLEANING THE BRAIN (Removing <think> tags)
-    // DeepSeek outputs its thoughts in <think> tags. We must hide them from the user.
-    aiResponseContent = aiResponseContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-
-    // 5. SAVE RESPONSE
     await supabase.from('conversations').insert({ user_id: userId, role: 'assistant', content: aiResponseContent, mode: mode, tokens_used: data.usage?.total_tokens || 0 });
 
     return res.status(200).json({ message: aiResponseContent })
