@@ -91,46 +91,38 @@ export default async function handler(req, res) {
     } 
 
             else if (mode === 'lessons') {
-      const lessonData = getLessonData(lessonId); // دالة جلب الدرس من الملف
+      aiTemperature = 0.1; // حرارة صفرية تقريباً (روبوت)
+      const lessonData = getLessonData(lessonId);
       
-      // 1. استخراج المحتوى المكتوب في الملف (وليس توليده)
-      // إذا كان الدرس يحتوي على "content" في الملف، سنستخدمه.
-      // إذا لم يكن يحتوي (درس مستقبلي)، سنطلب من الـ AI التوليد كخطة بديلة.
-      
-      const hasHardcodedContent = lessonData.content && Array.isArray(lessonData.content);
-      
-      const contentBlock = hasHardcodedContent
-        ? `🛑 MANDATORY SOURCE MATERIAL (READ ONLY):
-${lessonData.content.join("\n")}
-------------------------------------------------` 
-        : `⚠️ NO DATA IN LIBRARY. Generate 3 examples for "${lessonData.topic}" using STRICT format: {{ Kanji }} (Romaji).`;
+      // استخراج المحتوى من الملف (إن وجد)
+      const contentBlock = lessonData.content 
+        ? `📖 OFFICIAL LESSON CONTENT (TEACH THIS EXACTLY):\n${lessonData.content.join("\n")}` 
+        : `⚠️ NO DATA. Generate content for "${lessonData.topic}" using strict {{ Kanji }} (Romaji) format.`;
 
-      // 2. التعليمات الصارمة (للامتحان والتدريس)
       if (lessonData.type === 'EXAM') {
           systemPrompt = `You are the PROCTOR.
-          CONTEXT: ${lessonData.context}. 
-          GOAL: Test on ${lessonData.topic}.
-          
+          GOAL: Test user on "${lessonData.topic}".
+          ${AUDIO_RULES}
           ${contentBlock}
           
-          RULES: 
-          1. Ask questions based DIRECTLY on the "MANDATORY SOURCE MATERIAL" above.
-          2. Do NOT invent new words. Test them on what is listed above.
-          3. Use the exact Japanese formatting provided in the material.
-          4. If pass: "[EXAM_PASSED]".
+          RULES:
+          1. Ask 3 questions based ONLY on the OFFICIAL CONTENT above.
+          2. Use strict formatting.
+          3. If user passes 3 questions, output ONLY: "[EXAM_PASSED]".
           `;
       } else {
           systemPrompt = `You are Sensei teaching Lesson ${lessonId}: "${lessonData.title}".
           TOPIC: ${lessonData.topic}.
-          
+          ${AUDIO_RULES}
           ${contentBlock}
           
-          INSTRUCTIONS (FOLLOW ORDER): 
-          1. Start by DISPLAYING the "MANDATORY SOURCE MATERIAL" list above to the user exactly as written.
-          2. Do NOT summarize it. Do NOT translate it differently. Copy-paste the Japanese parts.
-          3. After showing the list, explain the grammar briefly in English.
-          4. Ask the user to type one of the phrases.
-          5. STRICT GATEKEEPING: If they type it correctly, end with: "[LESSON_COMPLETE]".
+          INSTRUCTIONS:
+          1. Present the "OFFICIAL LESSON CONTENT" above to the user.
+          2. Explain the grammar briefly in English.
+          3. Ask the user to repeat or translate one phrase.
+          4. STRICT GATEKEEPING: 
+             - If correct: Say "Correct!" and write exactly: "[LESSON_COMPLETE]".
+             - If wrong: Correct them and ask again.
           `;
       }
     }
