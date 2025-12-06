@@ -67,30 +67,33 @@ export default async function handler(req, res) {
       - Reply in English but mix in Japanese phrases.
       `;
     } 
-        else if (mode === 'lessons') {
-      // جلب البيانات
-      const lessonData = getLessonData(lessonId);
+            else if (mode === 'lessons') {
+      const lessonData = getLessonData(lessonId); // دالة جلب الدرس من الملف
       
-      // التحقق: هل يوجد محتوى حقيقي في الملف؟
-      const hasContent = lessonData.content && lessonData.content.length > 0;
+      // 1. استخراج المحتوى المكتوب في الملف (وليس توليده)
+      // إذا كان الدرس يحتوي على "content" في الملف، سنستخدمه.
+      // إذا لم يكن يحتوي (درس مستقبلي)، سنطلب من الـ AI التوليد كخطة بديلة.
       
-      // تجهيز كتلة المحتوى
-      const contentBlock = hasContent
-        ? `🛑 REQUIRED LESSON MATERIAL (YOU MUST DISPLAY THIS):
+      const hasHardcodedContent = lessonData.content && Array.isArray(lessonData.content);
+      
+      const contentBlock = hasHardcodedContent
+        ? `🛑 MANDATORY SOURCE MATERIAL (READ ONLY):
 ${lessonData.content.join("\n")}
 ------------------------------------------------` 
-        : `⚠️ NO DATA IN LIBRARY. Generate 3 examples for "${lessonData.topic}" using format: {{ Kanji }} (Romaji).`;
+        : `⚠️ NO DATA IN LIBRARY. Generate 3 examples for "${lessonData.topic}" using STRICT format: {{ Kanji }} (Romaji).`;
 
+      // 2. التعليمات الصارمة (للامتحان والتدريس)
       if (lessonData.type === 'EXAM') {
           systemPrompt = `You are the PROCTOR.
-          CONTEXT: ${lessonData.context}. GOAL: Test on ${lessonData.topic}.
+          CONTEXT: ${lessonData.context}. 
+          GOAL: Test on ${lessonData.topic}.
           
           ${contentBlock}
           
           RULES: 
-          1. Ask questions based DIRECTLY on the "REQUIRED LESSON MATERIAL" above.
+          1. Ask questions based DIRECTLY on the "MANDATORY SOURCE MATERIAL" above.
           2. Do NOT invent new words. Test them on what is listed above.
-          3. Use the exact Japanese formatting provided.
+          3. Use the exact Japanese formatting provided in the material.
           4. If pass: "[EXAM_PASSED]".
           `;
       } else {
@@ -100,7 +103,7 @@ ${lessonData.content.join("\n")}
           ${contentBlock}
           
           INSTRUCTIONS (FOLLOW ORDER): 
-          1. Start by DISPLAYING the "REQUIRED LESSON MATERIAL" list above to the user exactly as written.
+          1. Start by DISPLAYING the "MANDATORY SOURCE MATERIAL" list above to the user exactly as written.
           2. Do NOT summarize it. Do NOT translate it differently. Copy-paste the Japanese parts.
           3. After showing the list, explain the grammar briefly in English.
           4. Ask the user to type one of the phrases.
@@ -108,6 +111,7 @@ ${lessonData.content.join("\n")}
           `;
       }
     }
+
 
 
     // Call AI
