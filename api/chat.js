@@ -1,26 +1,26 @@
 import { createClient } from '@supabase/supabase-js'
-
-// ✅ Import the Real Curriculum
+// استيراد المكتبة (تأكد أن الملف موجود، وإلا سيعمل الكود على النسخة الاحتياطية)
 import { FULL_CURRICULUM } from '../data/curriculumData.js';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !process.env.GROQ_API_KEY) {
-  throw new Error("MISSING ENV VARIABLES IN VERCEL");
+  throw new Error("MISSING ENV VARIABLES");
 }
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 
-// ✅ Robust Lesson Getter
+// دالة جلب الدرس (مع احتياطي في حال فشل الاستيراد)
 const getLessonData = (id) => {
+    // 1. المحاولة من المكتبة المستوردة
     if (FULL_CURRICULUM && FULL_CURRICULUM[id]) {
         return FULL_CURRICULUM[id];
     }
-    // Fallback generator only if ID > 500
-    if (id % 5 === 0) return { title: `Rank Exam (Level ${id})`, topic: `Mastery Review`, context: "Advanced Trial", type: "EXAM" };
-    return { title: `Level ${id} Training`, topic: "Advanced Conversation", context: "Anime World Scenario", type: "TEACH" };
+    // 2. احتياطي (في حال لم يجد الملف)
+    if (id % 5 === 0) return { title: `Rank Exam (Level ${id})`, topic: "Review", context: "Exam Hall", type: "EXAM" };
+    return { title: `Level ${id} Training`, topic: "General Practice", context: "Dojo", type: "TEACH" };
 };
 
 export default async function handler(req, res) {
-  // ... (Keep your existing CORS and Method checks here) ...
+  // إعدادات CORS
   res.setHeader('Access-Control-Allow-Credentials', true)
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
@@ -33,64 +33,64 @@ export default async function handler(req, res) {
     const { messages, mode, userId, lessonId } = req.body
     if (!userId) return res.status(401).json({ error: "USER_ID_MISSING" });
 
-    // ... (Keep Subscription/Limit logic here) ...
-    const { data: user } = await supabase.from('users').select('subscription_status, subscription_ends_at').eq('id', userId).single();
+    // 1. التحقق من الاشتراك والحدود (10 رسائل)
+    const { data: user } = await supabase.from('users').select('subscription_status').eq('id', userId).single();
     const subscriptionStatus = user?.subscription_status || 'free'; 
+
     if (subscriptionStatus !== 'active') {
         const DAILY_LIMIT = 10; 
-        const today = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate())).toISOString(); 
-        const { count } = await supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', today).eq('role', 'user'); 
+        const now = new Date();
+        // توقيت UTC دقيق
+        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString(); 
+        
+        const { count } = await supabase.from('conversations')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gte('created_at', today)
+            .eq('role', 'user'); 
+            
         if (count >= DAILY_LIMIT) return res.status(403).json({ error: "LIMIT_EXCEEDED" });
     }
 
-    // ... (Keep Logging logic here) ...
+    // 2. تسجيل رسالة المستخدم
     const lastMessage = messages[messages.length - 1];
     if (lastMessage && lastMessage.role === 'user') {
         await supabase.from('conversations').insert({ user_id: userId, role: 'user', content: lastMessage.content, mode: mode });
     }
 
-    // 🛑 THE FIX: PROMPT ENGINEERING 🛑
+    // 3. هندسة الأوامر (PROMPT ENGINEERING) - المنطقة الحساسة
     let systemPrompt = "";
+    let aiTemperature = 0.3; // حرارة منخفضة للانضباط
+
+    // القواعد الصوتية الصارمة (تطبق على المودين)
+    const AUDIO_RULES = `
+    🛑 AUDIO & FORMATTING PROTOCOL (CRITICAL):
+    1. JAPANESE SCRIPT (Kanji/Kana) MUST be inside {{ double braces }}.
+    2. ROMAJI MUST be inside (parentheses) outside the braces.
+    3. ENGLISH MUST be outside everything.
     
-    // Rules for Japanese formatting
-    const STRICT_FORMAT = `
-    🛑 CRITICAL RULES:
-    1. Use Japanese Script (Kanji/Kana) inside {{ }}.
-    2. Romaji goes outside in ( ).
-    3. Example: "{{ こんにちは }} (Konnichiwa)"
+    ✅ CORRECT: "Say {{ こんにちは }} (Konnichiwa)."
+    ❌ WRONG: "Say Konnichiwa (Konnichiwa)." (No Romaji only!)
+    ❌ WRONG: "Say {{ Konnichiwa }}." (No Romaji inside braces!)
     `;
 
-        if (mode === 'chat') {
-      systemPrompt = `You are "FlowSensei", an energetic Anime Japanese tutor.
-      ${commonRules}
+    // --- مود الدردشة ---
+    if (mode === 'chat') {
+      aiTemperature = 0.7; // حرارة أعلى قليلاً للمرح
+      systemPrompt = `You are "FlowSensei", an Anime Japanese tutor.
+      ROLE: Friendly Rival. GOAL: Chat fun.
       
-      ROLE: Friendly Rival / Senpai.
-      GOAL: Chat freely about anime/manga in English, but inject Japanese constantly.
+      ${AUDIO_RULES}
       
-      🛑 ULTIMATE AUDIO PROTOCOL (VIOLATION = SYSTEM CRASH):
-      
-      1. **THE ROMAJI BAN:** You are FORBIDDEN from writing any Japanese word in English letters (Romaji) unless it is inside parentheses ( ) AFTER the Kanji.
-      
-      2. **THE TRANSLATION RULE:** If you want to say a Japanese word (e.g. "Sugoi"), you MUST convert it to Japanese script first.
-         - Thought: "I want to say Sugoi."
-         - Output: "{{ すごい }} (Sugoi)"
-      
-      3. **STRICT PATTERN:**
-         ✅ "{{ 日本語 }} (Romaji)"  <-- ONLY THIS IS ALLOWED.
-         ❌ "Sugoi"                 <-- BANNED (Reads with English accent).
-         ❌ "{{ Sugoi }}"           <-- BANNED (English letters inside brackets).
-         ❌ "すごい"                 <-- BANNED (Missing Romaji for beginner).
-      
-      4. **ENGLISH PURITY:**
-         - Everything OUTSIDE {{ }} must be pure English.
-         - Everything INSIDE {{ }} must be pure Japanese Script.
-      
-      - Example: "That move was totally {{ かっこいい }} (Kakkoii)!"
-      - Example: "Don't give up! {{ 頑張って }} (Ganbatte)!"
+      INSTRUCTIONS:
+      - Chat mostly in English.
+      - Inject Japanese vocabulary frequently using the CORRECT format above.
+      - If user writes Romaji, correct them by showing the {{ Kanji/Kana }}.
+      - Use emojis: 🎌, ⚔️.
       `;
     } 
-
-            else if (mode === 'lessons') {
+    // --- مود الدروس (الصرامة القصوى) ---
+    else if (mode === 'lessons') {
       aiTemperature = 0.1; // حرارة صفرية تقريباً (روبوت)
       const lessonData = getLessonData(lessonId);
       
@@ -127,23 +127,23 @@ export default async function handler(req, res) {
       }
     }
 
-
-
-    // Call AI
+    // 4. استدعاء الذكاء الاصطناعي
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
           model: 'llama-3.3-70b-versatile', 
           messages: [{ role: 'system', content: systemPrompt }, ...messages], 
-          temperature: 0.3, // Keep it strict for lessons
+          temperature: aiTemperature, // استخدام الحرارة المتغيرة
           max_tokens: 600 
       })
     })
     
     const data = await response.json()
+    if (data.error) throw new Error(`Groq API Error: ${data.error.message}`);
     const aiResponseContent = data.choices[0].message.content;
 
+    // 5. تسجيل الرد
     await supabase.from('conversations').insert({ user_id: userId, role: 'assistant', content: aiResponseContent, mode: mode, tokens_used: data.usage?.total_tokens || 0 });
 
     return res.status(200).json({ message: aiResponseContent })
