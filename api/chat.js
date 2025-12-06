@@ -67,43 +67,48 @@ export default async function handler(req, res) {
       - Reply in English but mix in Japanese phrases.
       `;
     } 
-    else if (mode === 'lessons') {
+        else if (mode === 'lessons') {
+      // جلب البيانات
       const lessonData = getLessonData(lessonId);
       
-      // ✅ FORCE-FEED THE CONTENT
-      // We take the 'content' array from the JSON and turn it into a string
-      // The AI MUST use this.
-      const contentBlock = lessonData.content 
-        ? `SOURCE MATERIAL (TEACH THIS ONLY):\n${lessonData.content.join("\n")}` 
-        : "No specific source material. Generate basic examples.";
+      // التحقق: هل يوجد محتوى حقيقي في الملف؟
+      const hasContent = lessonData.content && lessonData.content.length > 0;
+      
+      // تجهيز كتلة المحتوى
+      const contentBlock = hasContent
+        ? `🛑 REQUIRED LESSON MATERIAL (YOU MUST DISPLAY THIS):
+${lessonData.content.join("\n")}
+------------------------------------------------` 
+        : `⚠️ NO DATA IN LIBRARY. Generate 3 examples for "${lessonData.topic}" using format: {{ Kanji }} (Romaji).`;
 
       if (lessonData.type === 'EXAM') {
           systemPrompt = `You are the PROCTOR.
-          CONTEXT: ${lessonData.context}.
-          ${STRICT_FORMAT}
+          CONTEXT: ${lessonData.context}. GOAL: Test on ${lessonData.topic}.
           
           ${contentBlock}
           
           RULES: 
-          - Ask 3 questions based ONLY on the SOURCE MATERIAL above.
-          - If pass: "[EXAM_PASSED]".
+          1. Ask questions based DIRECTLY on the "REQUIRED LESSON MATERIAL" above.
+          2. Do NOT invent new words. Test them on what is listed above.
+          3. Use the exact Japanese formatting provided.
+          4. If pass: "[EXAM_PASSED]".
           `;
       } else {
           systemPrompt = `You are Sensei teaching Lesson ${lessonId}: "${lessonData.title}".
           TOPIC: ${lessonData.topic}.
           
-          ${STRICT_FORMAT}
-          
           ${contentBlock}
           
-          INSTRUCTIONS: 
-          1. Present the SOURCE MATERIAL clearly to the user.
-          2. Explain the meaning briefly in English.
-          3. Ask them to practice/repeat one phrase.
-          4. STRICT GATEKEEPING: If correct, end with: "[LESSON_COMPLETE]".
+          INSTRUCTIONS (FOLLOW ORDER): 
+          1. Start by DISPLAYING the "REQUIRED LESSON MATERIAL" list above to the user exactly as written.
+          2. Do NOT summarize it. Do NOT translate it differently. Copy-paste the Japanese parts.
+          3. After showing the list, explain the grammar briefly in English.
+          4. Ask the user to type one of the phrases.
+          5. STRICT GATEKEEPING: If they type it correctly, end with: "[LESSON_COMPLETE]".
           `;
       }
     }
+
 
     // Call AI
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
