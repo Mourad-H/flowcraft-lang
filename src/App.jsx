@@ -165,80 +165,65 @@ export default function FlowCraftLang() {
     setSession(null);
   };
 
-                  const speak = (text) => {
+                    const speak = (text) => {
     if (!window.speechSynthesis) return;
     
-    // 1. إيقاف أي كلام قديم فوراً
-    window.speechSynthesis.cancel();
-    setIsSpeaking(true); // تحريك الأفاتار
+    // 1. إعادة الضبط
+    window.speechSynthesis.cancel(); 
+    setIsSpeaking(true);
 
-        // 🛑 الفلتر الأول: تنظيف وفصل
-    let processedText = text
-        .replace(/\[.*?\]/g, "")           // حذف وسوم النظام [LESSON]
-        .replace(/[\(\)]/g, " ")           // استبدال الأقواس بمسافة
-        .replace(/[-_*]/g, " ")            // ✅ جديد: حذف الداش والنجمة والخط السفلي (لمنع نطقها)
-        .replace(/\{\{/g, " {{")           // مسافة قبل اليابانية
-        .replace(/\}\}/g, "}} ")           // مسافة بعد اليابانية
-        .replace(/\s+/g, " ")              // تنظيف المسافات
+    // 2. تنظيف النص (الفلتر الكامل)
+    let cleanText = text
+        .replace(/\[.*?\]/g, "")            // حذف وسوم النظام [LESSON]
+        .replace(/[\(\)]/g, " ")            // استبدال الأقواس بمسافة
+        .replace(/[-_*]/g, " ")             // ✅ الفلتر الذي سألت عنه: حذف الداش والنجمة والخط السفلي
+        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '') // حذف الإيموجي
         .trim();
 
+    // التقسيم
+    const parts = cleanText.split(/([\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+)/g);
 
-    // 2. التقسيم الذكي
-    const parts = processedText.split(/(\{\{.*?\}\})/g);
-
-    // تجهيز الأصوات مرة واحدة
     const voices = window.speechSynthesis.getVoices();
-    const jaVoice = voices.find(v => v.lang.includes('ja') || v.name.includes('Japan'));
+    const jaVoice = voices.find(v => v.lang.includes('ja')) || voices.find(v => v.name.includes('Japan'));
     const enVoice = voices.find(v => v.lang.includes('en-US')) || voices.find(v => v.lang.includes('en'));
 
-    // 🛑 الفلتر الثاني: طابور السرعة (De-lagging)
     let utteranceCount = 0;
-    
-    parts.forEach((rawPart, index) => {
-        // تنظيف الجزء من أقواس {{ }} للنطق فقط
-        const partToSpeak = rawPart.replace(/[\{\}]/g, "").trim();
-        
-        if (!partToSpeak) return;
+
+    parts.forEach((part, index) => {
+        if (!part.trim()) return;
         utteranceCount++;
 
-        const utterance = new SpeechSynthesisUtterance(partToSpeak);
+        // ✅ إضافة "الفاصلة الآمنة" (, ) لعمل وقفة تنفس بدون مشاكل
+        const utterance = new SpeechSynthesisUtterance(part + ", ");
 
-        // هل هذا الجزء كان داخل أقواس {{ }}؟ (إذن هو ياباني)
-        const isJapaneseSection = rawPart.startsWith("{{");
+        const isJapanese = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/.test(part);
 
-        // ضبط الصوت والمشاعر
-        let pitch = 1.0; 
-        let rate = 1.0; // السرعة الطبيعية (1.0) هي الأفضل للتدفق
+        // إعدادات المشاعر (السرعة والنبرة)
+        let pitch = 1.0; let rate = 1.0;
+        if (part.includes("!") || part.includes("！")) { pitch = 1.2; rate = 1.1; }
+        else if (part.includes("?") || part.includes("？")) { pitch = 1.1; }
+        else if (part.includes("...") || part.includes("…")) { rate = 0.8; }
 
-        if (partToSpeak.includes("!") || partToSpeak.includes("！")) { pitch = 1.1; rate = 1.1; }
-        else if (partToSpeak.includes("?") || partToSpeak.includes("？")) { pitch = 1.1; }
-        
-        if (isJapaneseSection) {
+        if (isJapanese) {
             utterance.lang = 'ja-JP';
             if (jaVoice) utterance.voice = jaVoice;
-            // اليابانية عادة أسرع، نبطئها قليلاً جداً لتتناغم مع الإنجليزية
-            utterance.rate = rate * 0.95; 
+            utterance.rate = rate * 0.9; 
         } else {
             utterance.lang = 'en-US';
             if (enVoice) utterance.voice = enVoice;
-            utterance.rate = rate * 1.05; // تسريع الإنجليزية قليلاً لتقليل الملل
+            utterance.rate = rate * 1.1; 
         }
         
         utterance.pitch = pitch;
 
-        // 3. إدارة الأفاتار (إيقافه عند آخر جملة فقط)
+        // إيقاف الأفاتار في النهاية
         if (index === parts.length - 1 || utteranceCount === parts.length) {
             utterance.onend = () => setIsSpeaking(false);
         }
-
-        // 🔥 الإطلاق الفوري: نضعهم في الطابور وراء بعضهم فوراً
-        // المتصفح سيجهز الصوت التالي بينما الحالي يعمل
+        
         window.speechSynthesis.speak(utterance);
     });
   };
-
-
-
 
 
   const handleSend = async () => {
