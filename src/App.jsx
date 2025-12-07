@@ -165,46 +165,78 @@ export default function FlowCraftLang() {
     setSession(null);
   };
 
-                // دالة النطق المنقحة (No Punctuation + Smart Language)
-  
-   const speak = (text) => {
+                  const speak = (text) => {
     if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); // إيقاف القديم
+    
+    // 1. إيقاف أي كلام قديم فوراً
+    window.speechSynthesis.cancel();
+    setIsSpeaking(true); // تحريك الأفاتار
 
-    // 1. تنظيف النص: إزالة [System Tags] + الإيموجي + الأقواس () + الفواصل ,
-    let cleanText = text
-        .replace(/\[.*?\\.]/g, "")          // حذف [LESSON_COMPLETE]
-        .replace(/[\(\),\.]/g, "")          // 🛑 حذف الأقواس والفواصل (، , ( ))
-        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2700-\u27BF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, ''); // حذف الإيموجي
+        // 🛑 الفلتر الأول: تنظيف وفصل
+    let processedText = text
+        .replace(/\[.*?\]/g, "")           // حذف وسوم النظام [LESSON]
+        .replace(/[\(\)]/g, " ")           // استبدال الأقواس بمسافة
+        .replace(/[-_*]/g, " ")            // ✅ جديد: حذف الداش والنجمة والخط السفلي (لمنع نطقها)
+        .replace(/\{\{/g, " {{")           // مسافة قبل اليابانية
+        .replace(/\}\}/g, "}} ")           // مسافة بعد اليابانية
+        .replace(/\s+/g, " ")              // تنظيف المسافات
+        .trim();
 
-    // 2. تقسيم النص بناءً على الأقواس الذكية {{ }} (للتفريق بين اللغات)
-    const parts = cleanText.split(/\{\{(.*?)\}\}/g);
 
+    // 2. التقسيم الذكي
+    const parts = processedText.split(/(\{\{.*?\}\})/g);
+
+    // تجهيز الأصوات مرة واحدة
     const voices = window.speechSynthesis.getVoices();
-    const jaVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || voices.find(v => v.lang === 'ja-JP');
-    const enVoice = voices.find(v => v.lang.includes("en-US")) || voices.find(v => v.lang.includes("en"));
+    const jaVoice = voices.find(v => v.lang.includes('ja') || v.name.includes('Japan'));
+    const enVoice = voices.find(v => v.lang.includes('en-US')) || voices.find(v => v.lang.includes('en'));
 
-    // 3. تشغيل القطع بالتتابع
-    parts.forEach((part, index) => {
-        if (!part.trim()) return; 
-
-        const utterance = new SpeechSynthesisUtterance(part);
+    // 🛑 الفلتر الثاني: طابور السرعة (De-lagging)
+    let utteranceCount = 0;
+    
+    parts.forEach((rawPart, index) => {
+        // تنظيف الجزء من أقواس {{ }} للنطق فقط
+        const partToSpeak = rawPart.replace(/[\{\}]/g, "").trim();
         
-        // الاندكس الفردي (داخل {{ }}) = ياباني
-        // الاندكس الزوجي (خارج {{ }}) = إنجليزي
-        if (index % 2 === 1) {
+        if (!partToSpeak) return;
+        utteranceCount++;
+
+        const utterance = new SpeechSynthesisUtterance(partToSpeak);
+
+        // هل هذا الجزء كان داخل أقواس {{ }}؟ (إذن هو ياباني)
+        const isJapaneseSection = rawPart.startsWith("{{");
+
+        // ضبط الصوت والمشاعر
+        let pitch = 1.0; 
+        let rate = 1.0; // السرعة الطبيعية (1.0) هي الأفضل للتدفق
+
+        if (partToSpeak.includes("!") || partToSpeak.includes("！")) { pitch = 1.1; rate = 1.1; }
+        else if (partToSpeak.includes("?") || partToSpeak.includes("？")) { pitch = 1.1; }
+        
+        if (isJapaneseSection) {
             utterance.lang = 'ja-JP';
             if (jaVoice) utterance.voice = jaVoice;
-            utterance.rate = 0.9; 
+            // اليابانية عادة أسرع، نبطئها قليلاً جداً لتتناغم مع الإنجليزية
+            utterance.rate = rate * 0.95; 
         } else {
             utterance.lang = 'en-US';
             if (enVoice) utterance.voice = enVoice;
-            utterance.rate = 1.1; 
+            utterance.rate = rate * 1.05; // تسريع الإنجليزية قليلاً لتقليل الملل
         }
-            
+        
+        utterance.pitch = pitch;
+
+        // 3. إدارة الأفاتار (إيقافه عند آخر جملة فقط)
+        if (index === parts.length - 1 || utteranceCount === parts.length) {
+            utterance.onend = () => setIsSpeaking(false);
+        }
+
+        // 🔥 الإطلاق الفوري: نضعهم في الطابور وراء بعضهم فوراً
+        // المتصفح سيجهز الصوت التالي بينما الحالي يعمل
         window.speechSynthesis.speak(utterance);
     });
   };
+
 
 
 
