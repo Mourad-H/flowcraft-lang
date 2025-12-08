@@ -165,22 +165,27 @@ export default function FlowCraftLang() {
     setSession(null);
   };
 
-                    const speak = (text) => {
+                      const speak = (text) => {
     if (!window.speechSynthesis) return;
     
-    // 1. إعادة الضبط
+    // 1. إنعاش القلب: إيقاف أي عملية عالقة فوراً
     window.speechSynthesis.cancel(); 
     setIsSpeaking(true);
 
-    // 2. تنظيف النص (الفلتر الكامل)
+    // 2. الفلتر الآمن:
+    // - يحذف الأقواس () []
+    // - يحذف الداش والنجمة والخط السفلي - * _ (لأنها تقرأ بصوت مزعج)
+    // - يبقي الفاصلة والنقطة ( , . ! ? ) لأنها ضرورية للتنفس
     let cleanText = text
-        .replace(/\[.*?\]/g, "")            // حذف وسوم النظام [LESSON]
-        .replace(/[\(\)]/g, " ")            // استبدال الأقواس بمسافة
-        .replace(/[-_*]/g, " ")             // ✅ الفلتر الذي سألت عنه: حذف الداش والنجمة والخط السفلي
+        .replace(/\[.*?\]/g, "")            // حذف [Tags]
+        .replace(/[\(\)]/g, " ")            // حذف الأقواس
+        .replace(/[-_*]/g, " ")             // حذف الرموز المزعجة
         .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '') // حذف الإيموجي
         .trim();
 
-    // التقسيم
+    if (!cleanText) return; // 🛑 حماية: إذا كان النص فارغاً لا تفعل شيئاً
+
+    // 3. التقسيم الذكي
     const parts = cleanText.split(/([\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+)/g);
 
     const voices = window.speechSynthesis.getVoices();
@@ -190,19 +195,20 @@ export default function FlowCraftLang() {
     let utteranceCount = 0;
 
     parts.forEach((part, index) => {
-        if (!part.trim()) return;
+        // 🛑 حماية إضافية: تجاهل الأجزاء الفارغة تماماً
+        if (!part || !part.trim()) return;
+        
         utteranceCount++;
 
-        // ✅ إضافة "الفاصلة الآمنة" (, ) لعمل وقفة تنفس بدون مشاكل
+        // إضافة فاصلة خفيفة لإجبار التوقف الطبيعي
         const utterance = new SpeechSynthesisUtterance(part + ", ");
-
         const isJapanese = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/.test(part);
 
-        // إعدادات المشاعر (السرعة والنبرة)
+        // إعدادات الصوت (نبرة وسرعة)
         let pitch = 1.0; let rate = 1.0;
-        if (part.includes("!") || part.includes("！")) { pitch = 1.2; rate = 1.1; }
-        else if (part.includes("?") || part.includes("？")) { pitch = 1.1; }
-        else if (part.includes("...") || part.includes("…")) { rate = 0.8; }
+        if (part.includes("!")) { pitch = 1.2; rate = 1.1; }
+        else if (part.includes("?")) pitch = 1.1;
+        else if (part.includes("...")) rate = 0.8;
 
         if (isJapanese) {
             utterance.lang = 'ja-JP';
@@ -224,6 +230,7 @@ export default function FlowCraftLang() {
         window.speechSynthesis.speak(utterance);
     });
   };
+
 
 
   const handleSend = async () => {
