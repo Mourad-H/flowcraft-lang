@@ -23,6 +23,21 @@ export default function FlowCraftLang() {
   const [msgCount, setMsgCount] = useState(0);
   const [isListening, setIsListening] = useState(false); // 🎤 حالة الميكروفون
   const [isSpeaking, setIsSpeaking] = useState(false); 
+    // 🆕 حالات جديدة للباسورد
+  const [showPassword, setShowPassword] = useState(false); // 👁️ إظهار/إخفاء
+  const [isResetView, setIsResetView] = useState(false);   // 🔄 وضع استعادة كلمة السر
+
+  // 🆕 دالة إرسال رابط الاستعادة
+  const handlePasswordReset = async () => {
+      if (!email) { setAuthMessage("Please enter your email first."); return; }
+      setLoading(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin, // سيعيدهم للموقع مسجلين الدخول لتغيير الباسورد
+      });
+      if (error) setAuthMessage(error.message);
+      else setAuthMessage("Check your email for the reset link!");
+      setLoading(false);
+  };
   
   // Billing State
   const [billingCycle, setBillingCycle] = useState('monthly');
