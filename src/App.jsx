@@ -429,17 +429,69 @@ export default function FlowCraftLang() {
             Learn Japanese <br/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-anime-warning to-orange-500">The Shonen Way</span>
           </h1>
+                    {/* صندوق الدخول المطور */}
           <div className="max-w-md w-full mt-10 p-8 bg-[#1e293b]/80 backdrop-blur-xl rounded-2xl border border-white/10 shadow-[0_0_50px_rgba(56,189,248,0.2)]">
-            <h2 className="text-2xl font-bold mb-6 text-white">{isLoginView ? 'Initialize Link' : 'New Recruit'}</h2>
+            <h2 className="text-2xl font-bold mb-6 text-white">
+                {isResetView ? 'Reset Password' : (isLoginView ? 'Initialize Link' : 'New Recruit')}
+            </h2>
+            
             <div className="flex flex-col gap-4">
-              <input type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-white focus:border-anime-primary focus:shadow-[0_0_15px_rgba(56,189,248,0.5)] outline-none transition" />
-              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-white focus:border-anime-accent focus:shadow-[0_0_15px_rgba(244,114,182,0.5)] outline-none transition" />
-              <button onClick={() => handleAuthSubmit(!isLoginView)} disabled={loading || !email || !password} className="w-full bg-gradient-to-r from-anime-primary to-blue-600 text-black font-black text-lg py-4 rounded-xl hover:scale-[1.02] active:scale-95 transition shadow-lg shadow-blue-500/30">
-                {loading ? 'Processing...' : (isLoginView ? 'ENTER SYSTEM 🚀' : 'START JOURNEY ⚔️')}
-              </button>
+              <input 
+                type="email" 
+                placeholder="Email Address" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-white focus:border-anime-primary outline-none transition" 
+              />
+              
+              {/* 👁️ حقل الباسورد مع زر العين (يختفي في وضع الاستعادة) */}
+              {!isResetView && (
+                  <div className="relative">
+                      <input 
+                        type={showPassword ? "text" : "password"} 
+                        placeholder="Password" 
+                        value={password} 
+                        onChange={(e) => setPassword(e.target.value)} 
+                        className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-white focus:border-anime-accent outline-none transition pr-12" 
+                      />
+                      <button 
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-4 text-gray-400 hover:text-white"
+                      >
+                        {showPassword ? <EyeOff size={20}/> : <Eye size={20}/>}
+                      </button>
+                  </div>
+              )}
+
+              {/* الأزرار الرئيسية */}
+              {isResetView ? (
+                  <button onClick={handlePasswordReset} disabled={loading} className="w-full bg-anime-warning text-black font-bold py-4 rounded-xl hover:scale-[1.02] transition">
+                    {loading ? 'Sending...' : 'Send Reset Link 📧'}
+                  </button>
+              ) : (
+                  <button onClick={() => handleAuthSubmit(!isLoginView)} disabled={loading || !email || !password} className="w-full bg-gradient-to-r from-anime-primary to-blue-600 text-black font-black text-lg py-4 rounded-xl hover:scale-[1.02] active:scale-95 transition shadow-lg shadow-blue-500/30">
+                    {loading ? 'Processing...' : (isLoginView ? 'ENTER SYSTEM 🚀' : 'START JOURNEY ⚔️')}
+                  </button>
+              )}
+
+              {/* 🔄 زر التبديل بين الدخول والنسيان */}
+              <div className="flex justify-between text-sm mt-2">
+                  {!isResetView && (
+                      <button onClick={() => setIsResetView(true)} className="text-gray-400 hover:text-anime-primary underline">
+                          Forgot Password?
+                      </button>
+                  )}
+                  {isResetView && (
+                      <button onClick={() => setIsResetView(false)} className="text-gray-400 hover:text-white">
+                          ← Back to Login
+                      </button>
+                  )}
+              </div>
+
               {authMessage && <p className="text-anime-accent text-sm mt-2 font-bold bg-anime-accent/10 p-2 rounded">{authMessage}</p>}
             </div>
           </div>
+
           <footer className="mt-10 mb-6 flex gap-6 justify-center flex-wrap">
     <button onClick={() => setView('privacy')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Privacy</button>
     <button onClick={() => setView('refund')} className="text-neon-white text-xs font-bold tracking-widest uppercase hover:text-white transition">Refund Policy</button>
