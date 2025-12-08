@@ -63,7 +63,7 @@ export default async function handler(req, res) {
     let aiTemperature = 0.3; // حرارة منخفضة للانضباط
 
     // ✅ تعريف المتغيرات هنا لتكون مرئية للجميع
-    const commonRules = `AUDIO RULES: Use Japanese punctuation (、 。) for pauses.`;
+    const AUDIO_RULES = `AUDIO RULES: Use Japanese punctuation (、 。) for pauses.`;
 
     const STRICT_FORMAT = `
     🛑 CRITICAL FORMATTING RULES (DO NOT IGNORE):
