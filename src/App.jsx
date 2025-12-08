@@ -22,8 +22,7 @@ export default function FlowCraftLang() {
   const [view, setView] = useState('home');
   const [msgCount, setMsgCount] = useState(0);
   const [isListening, setIsListening] = useState(false); // 🎤 حالة الميكروفون
-  
-
+  const [isSpeaking, setIsSpeaking] = useState(false); 
   
   // Billing State
   const [billingCycle, setBillingCycle] = useState('monthly');
