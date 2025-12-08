@@ -164,9 +164,7 @@ export default function FlowCraftLang() {
     setSession(null);
   };
 
-                       // دالة النطق المنقحة (No Punctuation + Smart Language)
-  
-      // دالة النطق المنقحة (No Punctuation + Smart Language)
+                 // دالة النطق المنقحة (No Punctuation + Smart Language)
   
    const speak = (text) => {
     if (!window.speechSynthesis) return;
