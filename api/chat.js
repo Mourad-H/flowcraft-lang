@@ -62,16 +62,17 @@ export default async function handler(req, res) {
     let systemPrompt = "";
     let aiTemperature = 0.3; // حرارة منخفضة للانضباط
 
-    // القواعد الصوتية الصارمة (تطبق على المودين)
-    const AUDIO_RULES = `
-    🛑 AUDIO & FORMATTING PROTOCOL (CRITICAL):
-    1. JAPANESE SCRIPT (Kanji/Kana) MUST be inside {{ double braces }}.
-    2. ROMAJI MUST be inside (parentheses) outside the braces.
-    3. ENGLISH MUST be outside everything.
+    // ✅ تعريف المتغيرات هنا لتكون مرئية للجميع
+    const commonRules = `AUDIO RULES: Use Japanese punctuation (、 。) for pauses.`;
+
+    const STRICT_FORMAT = `
+    🛑 CRITICAL FORMATTING RULES (DO NOT IGNORE):
+    1. Inside the double brackets {{ }}, you must WRITE ONLY JAPANESE SCRIPT (Kanji/Kana).
+    2. NEVER write Romaji or English inside {{ }}.
+    3. Romaji must go OUTSIDE and AFTER the brackets in parentheses.
     
-    ✅ CORRECT: "Say {{ こんにちは }} (Konnichiwa)."
-    ❌ WRONG: "Say Konnichiwa (Konnichiwa)." (No Romaji only!)
-    ❌ WRONG: "Say {{ Konnichiwa }}." (No Romaji inside braces!)
+    ✅ CORRECT: "{{ こんにちは }} (Konnichiwa)"
+    ❌ WRONG: "{{ Konnichiwa }}"
     `;
 
     // --- مود الدردشة ---
