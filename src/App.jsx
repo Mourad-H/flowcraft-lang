@@ -166,44 +166,72 @@ export default function FlowCraftLang() {
 
                        // دالة النطق المنقحة (No Punctuation + Smart Language)
   
-   const speak = (text) => {
+     const speak = (text) => {
     if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); // إيقاف القديم
+    
+    // 1. إنعاش القلب: إيقاف أي عملية عالقة فوراً
+    window.speechSynthesis.cancel(); 
+    setIsSpeaking(true);
 
-    // 1. تنظيف النص: إزالة [System Tags] + الإيموجي + الأقواس () + الفواصل ,
+    // 2. الفلتر الآمن:
+    // - يحذف الأقواس () []
+    // - يحذف الداش والنجمة والخط السفلي - * _ (لأنها تقرأ بصوت مزعج)
+    // - يبقي الفاصلة والنقطة ( , . ! ? ) لأنها ضرورية للتنفس
     let cleanText = text
-        .replace(/\[.*?\\.]/g, "")          // حذف [LESSON_COMPLETE]
-        .replace(/[\(\),\.]/g, "")          // 🛑 حذف الأقواس والفواصل (، , ( ))
-        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2700-\u27BF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, ''); // حذف الإيموجي
+        .replace(/\[.*?\]/g, "")            // حذف [Tags]
+        .replace(/[\(\)]/g, " ")            // حذف الأقواس
+        .replace(/[-_*]/g, " ")             // حذف الرموز المزعجة
+        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '') // حذف الإيموجي
+        .trim();
 
-    // 2. تقسيم النص بناءً على الأقواس الذكية {{ }} (للتفريق بين اللغات)
-    const parts = cleanText.split(/\{\{(.*?)\}\}/g);
+    if (!cleanText) return; // 🛑 حماية: إذا كان النص فارغاً لا تفعل شيئاً
+
+    // 3. التقسيم الذكي
+    const parts = cleanText.split(/([\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+)/g);
 
     const voices = window.speechSynthesis.getVoices();
-    const jaVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("ja")) || voices.find(v => v.lang === 'ja-JP');
-    const enVoice = voices.find(v => v.lang.includes("en-US")) || voices.find(v => v.lang.includes("en"));
+    const jaVoice = voices.find(v => v.lang.includes('ja')) || voices.find(v => v.name.includes('Japan'));
+    const enVoice = voices.find(v => v.lang.includes('en-US')) || voices.find(v => v.lang.includes('en'));
 
-    // 3. تشغيل القطع بالتتابع
+    let utteranceCount = 0;
+
     parts.forEach((part, index) => {
-        if (!part.trim()) return; 
-
-        const utterance = new SpeechSynthesisUtterance(part);
+        // 🛑 حماية إضافية: تجاهل الأجزاء الفارغة تماماً
+        if (!part || !part.trim()) return;
         
-        // الاندكس الفردي (داخل {{ }}) = ياباني
-        // الاندكس الزوجي (خارج {{ }}) = إنجليزي
-        if (index % 2 === 1) {
+        utteranceCount++;
+
+        // إضافة فاصلة خفيفة لإجبار التوقف الطبيعي
+        const utterance = new SpeechSynthesisUtterance(part + ", ");
+        const isJapanese = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/.test(part);
+
+        // إعدادات الصوت (نبرة وسرعة)
+        let pitch = 1.0; let rate = 1.0;
+        if (part.includes("!")) { pitch = 1.2; rate = 1.1; }
+        else if (part.includes("?")) pitch = 1.1;
+        else if (part.includes("...")) rate = 0.8;
+
+        if (isJapanese) {
             utterance.lang = 'ja-JP';
             if (jaVoice) utterance.voice = jaVoice;
-            utterance.rate = 0.9; 
+            utterance.rate = rate * 0.9; 
         } else {
             utterance.lang = 'en-US';
             if (enVoice) utterance.voice = enVoice;
-            utterance.rate = 1.1; 
+            utterance.rate = rate * 1.1; 
         }
-            
+        
+        utterance.pitch = pitch;
+
+        // إيقاف الأفاتار في النهاية
+        if (index === parts.length - 1 || utteranceCount === parts.length) {
+            utterance.onend = () => setIsSpeaking(false);
+        }
+        
         window.speechSynthesis.speak(utterance);
     });
   };
+
 
 
 
