@@ -9,7 +9,7 @@ export const PrivacyPolicy = ({ setView }) => (
       <button 
         onClick={() => setView('home')} 
         className="group flex items-center gap-2 text-gray-300 hover:text-white transition mb-8 font-bold"
-      
+      >
         <ChevronLeft className="group-hover:-translate-x-1 transition" size={20}/> Back to Dojo
       </button>
 
