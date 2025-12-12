@@ -35,7 +35,7 @@ export const Terms = ({ setView }) => (
 
           <section>
             <h2 className="text-xl font-bold text-white mb-2 neon-text">3. Subscriptions</h2>
-            <p>Subscriptions are billed in advance on a monthly or yearly basis via our Merchant of Record (Paddle). You may cancel at any time to stop future billing.</p>
+            <p>Subscriptions are billed in advance on a monthly or yearly basis via our Merchant of Record (NowPayments/Whop). You may cancel at any time to stop future billing.</p>
           </section>
 
           <section>
