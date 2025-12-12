@@ -19,8 +19,7 @@ export const Terms = ({ setView }) => (
         </h1>
         <p className="text-gray-300 mb-10 font-mono text-sm border-b border-white/10 pb-6">
           Last Update: December 1, 2025 <br/>
-          <strong>Operator:</strong> Mourad Hamel (Sole Proprietor) <br/>
-          <strong>Jurisdiction:</strong> Algeria
+          <strong>Operator:</strong> FlowCraftCo (Sole Proprietor) <br/>
         </p>
 
         <div className="space-y-8 text-slate-200 leading-relaxed text-lg drop-shadow-md">
