@@ -57,7 +57,7 @@ export const RefundPolicy = ({ setView }) => (
               <span className="text-anime-primary">03.</span> How to Initiate
             </h2>
             <p className="mb-4">
-              Send a signal to our support team. We process refunds via our Merchant of Record (Paddle/NowPayments).
+              Send a signal to our support team. We process refunds via our Merchant of Record (Whop/NowPayments).
             </p>
             <a href="mailto:support@flowcraftco.com" className="inline-block bg-white/10 hover:bg-white/20 border border-white/20 px-6 py-3 rounded-lg text-anime-accent transition font-bold">
               Contact: support@flowcraftco.com
